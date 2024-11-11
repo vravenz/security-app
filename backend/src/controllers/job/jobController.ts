@@ -77,14 +77,15 @@ export const handleJobOfferResponse = async (req: Request, res: Response) => {
 
                     const email = applicant.email;
                     const roleOffered = jobOffer.role_offered;
-                    if (!roleOffered) throw new Error("Role not specified in job offer.");
+                    const applicantId = applicant.applicant_id;
+
 
                     // Generate a random 6-character alphanumeric password
                     const generatedPassword = Math.random().toString(36).slice(-6);
                     const hashedPassword = await hashPassword(generatedPassword);
 
                     // Create user with the applicant's email, generated password, and role
-                    const newUser = await createUser(email, hashedPassword, applicant.company_id, roleOffered);
+                    const newUser = await createUser(email, hashedPassword, applicant.company_id, roleOffered, false, applicantId);
                     if (!newUser.user_pin) throw new Error("Failed to generate user PIN.");
 
                     // Send login credentials to applicant
@@ -109,7 +110,6 @@ export const handleJobOfferResponse = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 };
-
 
 export const getJobOffers = async (req: Request, res: Response) => {
     try {

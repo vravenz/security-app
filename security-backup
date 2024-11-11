@@ -5,7 +5,7 @@
 -- Dumped from database version 16.2
 -- Dumped by pg_dump version 16.2
 
--- Started on 2024-10-16 16:00:21 PKT
+-- Started on 2024-11-11 18:29:02 PKT
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -34,7 +34,30 @@ CREATE TABLE public.applicants (
     last_name character varying(100) NOT NULL,
     email character varying(255) NOT NULL,
     phone character varying(20),
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    middle_name character varying(100),
+    ni_number character varying(20),
+    ebds_number character varying(50),
+    second_phone character varying(20),
+    gender character varying(10),
+    nationality character varying(50),
+    relationship_status character varying(50),
+    next_of_kin_contact_no character varying(20),
+    next_of_kin character varying(50),
+    date_of_birth date,
+    sia_licence character varying(100),
+    licence_type character varying(50),
+    licence_expiry date,
+    sia_not_required boolean DEFAULT false,
+    additional_sia_licence character varying(100),
+    additional_licence_type character varying(50),
+    additional_licence_expiry date,
+    pwva_trained boolean DEFAULT false,
+    employee_photo character varying(255),
+    leisure character varying(10),
+    leisure_interests character varying(255),
+    criminal_record character varying(10),
+    criminal_record_details character varying(255)
 );
 
 
@@ -57,7 +80,7 @@ CREATE SEQUENCE public.applicants_applicant_id_seq
 ALTER SEQUENCE public.applicants_applicant_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3693 (class 0 OID 0)
+-- TOC entry 3701 (class 0 OID 0)
 -- Dependencies: 223
 -- Name: applicants_applicant_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -98,7 +121,7 @@ CREATE SEQUENCE public.applications_application_id_seq
 ALTER SEQUENCE public.applications_application_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3694 (class 0 OID 0)
+-- TOC entry 3702 (class 0 OID 0)
 -- Dependencies: 225
 -- Name: applications_application_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -139,7 +162,7 @@ CREATE SEQUENCE public.companies_company_id_seq
 ALTER SEQUENCE public.companies_company_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3695 (class 0 OID 0)
+-- TOC entry 3703 (class 0 OID 0)
 -- Dependencies: 219
 -- Name: companies_company_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -181,7 +204,7 @@ CREATE SEQUENCE public.interviews_interview_id_seq
 ALTER SEQUENCE public.interviews_interview_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3696 (class 0 OID 0)
+-- TOC entry 3704 (class 0 OID 0)
 -- Dependencies: 227
 -- Name: interviews_interview_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -199,7 +222,14 @@ CREATE TABLE public.job_offers (
     application_id integer NOT NULL,
     offer_details text,
     offered_on timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    status character varying(50) DEFAULT 'Offered'::character varying NOT NULL
+    status character varying(50) DEFAULT 'Offered'::character varying NOT NULL,
+    signed_on timestamp with time zone,
+    token character varying(255),
+    hourly_pay_rate numeric(10,2),
+    payment_period character varying(50),
+    fixed_pay numeric(10,2),
+    travel_expense numeric(10,2),
+    role_offered character varying(50)
 );
 
 
@@ -222,7 +252,7 @@ CREATE SEQUENCE public.job_offers_offer_id_seq
 ALTER SEQUENCE public.job_offers_offer_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3697 (class 0 OID 0)
+-- TOC entry 3705 (class 0 OID 0)
 -- Dependencies: 229
 -- Name: job_offers_offer_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -269,7 +299,7 @@ CREATE SEQUENCE public.jobs_job_id_seq
 ALTER SEQUENCE public.jobs_job_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3698 (class 0 OID 0)
+-- TOC entry 3706 (class 0 OID 0)
 -- Dependencies: 221
 -- Name: jobs_job_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -307,7 +337,7 @@ CREATE SEQUENCE public.roles_role_id_seq
 ALTER SEQUENCE public.roles_role_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3699 (class 0 OID 0)
+-- TOC entry 3707 (class 0 OID 0)
 -- Dependencies: 215
 -- Name: roles_role_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -327,7 +357,12 @@ CREATE TABLE public.users (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     role_id integer DEFAULT 1 NOT NULL,
-    company_id integer
+    company_id integer,
+    user_pin integer,
+    is_main_user boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    applicant_id integer,
+    is_deleted boolean DEFAULT false
 );
 
 
@@ -350,7 +385,7 @@ CREATE SEQUENCE public.users_id_seq
 ALTER SEQUENCE public.users_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3700 (class 0 OID 0)
+-- TOC entry 3708 (class 0 OID 0)
 -- Dependencies: 217
 -- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -359,7 +394,7 @@ ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
--- TOC entry 3490 (class 2604 OID 18803)
+-- TOC entry 3493 (class 2604 OID 18803)
 -- Name: applicants applicant_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -367,7 +402,7 @@ ALTER TABLE ONLY public.applicants ALTER COLUMN applicant_id SET DEFAULT nextval
 
 
 --
--- TOC entry 3492 (class 2604 OID 18818)
+-- TOC entry 3497 (class 2604 OID 18818)
 -- Name: applications application_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -375,7 +410,7 @@ ALTER TABLE ONLY public.applications ALTER COLUMN application_id SET DEFAULT nex
 
 
 --
--- TOC entry 3483 (class 2604 OID 18773)
+-- TOC entry 3486 (class 2604 OID 18773)
 -- Name: companies company_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -383,7 +418,7 @@ ALTER TABLE ONLY public.companies ALTER COLUMN company_id SET DEFAULT nextval('p
 
 
 --
--- TOC entry 3495 (class 2604 OID 18837)
+-- TOC entry 3500 (class 2604 OID 18837)
 -- Name: interviews interview_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -391,7 +426,7 @@ ALTER TABLE ONLY public.interviews ALTER COLUMN interview_id SET DEFAULT nextval
 
 
 --
--- TOC entry 3496 (class 2604 OID 18851)
+-- TOC entry 3501 (class 2604 OID 18851)
 -- Name: job_offers offer_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -399,7 +434,7 @@ ALTER TABLE ONLY public.job_offers ALTER COLUMN offer_id SET DEFAULT nextval('pu
 
 
 --
--- TOC entry 3485 (class 2604 OID 18786)
+-- TOC entry 3488 (class 2604 OID 18786)
 -- Name: jobs job_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -423,74 +458,79 @@ ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_
 
 
 --
--- TOC entry 3681 (class 0 OID 18800)
+-- TOC entry 3689 (class 0 OID 18800)
 -- Dependencies: 224
 -- Data for Name: applicants; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.applicants (applicant_id, company_id, first_name, last_name, email, phone, created_at) FROM stdin;
-16	31	ahsan	khan	ahsan@gmail.com	09887654322	2024-10-16 14:07:50.103386+04
+COPY public.applicants (applicant_id, company_id, first_name, last_name, email, phone, created_at, middle_name, ni_number, ebds_number, second_phone, gender, nationality, relationship_status, next_of_kin_contact_no, next_of_kin, date_of_birth, sia_licence, licence_type, licence_expiry, sia_not_required, additional_sia_licence, additional_licence_type, additional_licence_expiry, pwva_trained, employee_photo, leisure, leisure_interests, criminal_record, criminal_record_details) FROM stdin;
+169	36	Qaiser	Malik	itsamirkhan9@gmail.com	123533	2024-11-11 09:37:13.007291+04		0007	2222	11111	Male	Pakistani	friend 	787676	faizi	2024-10-29	\N	\N	\N	t	\N	\N	\N	f	1731303432983_2-m.png	no		no	
+168	36	Amir	Khan	itsamirkhan4@outlook.com	123663	2024-11-11 07:23:50.013933+04		0007	2222	11111	Male	Pakistani	friend 	787676	faizi	2024-10-19	\N	\N	\N	t	\N	\N	\N	f	1731295430007_2-m.png	no		no	
 \.
 
 
 --
--- TOC entry 3683 (class 0 OID 18815)
+-- TOC entry 3691 (class 0 OID 18815)
 -- Dependencies: 226
 -- Data for Name: applications; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.applications (application_id, job_id, applicant_id, application_status, applied_on) FROM stdin;
-7	20	16	Scheduled	2024-10-16 14:07:50.103386+04
+134	30	168	Offered	2024-11-11 07:23:50.013933+04
+135	30	169	Submitted	2024-11-11 09:37:13.007291+04
 \.
 
 
 --
--- TOC entry 3677 (class 0 OID 18770)
+-- TOC entry 3685 (class 0 OID 18770)
 -- Dependencies: 220
 -- Data for Name: companies; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.companies (company_id, first_name, last_name, created_at, company_name) FROM stdin;
-30	amir	khan	2024-10-15 16:31:58.469783+04	vravenz
-31	faizi	awan	2024-10-15 16:32:17.812909+04	volta
+36	faizi	awan	2024-11-01 09:44:37.240209+04	Nadra
+46	amir	khan	2024-11-09 07:31:06.28565+04	vravenz
+47	ak	sk	2024-11-09 07:51:25.166218+04	vvvk
+48	anjum	saeed	2024-11-11 07:26:01.406085+04	karshi
+49	ahsan	khan	2024-11-11 09:47:28.409977+04	saudia
 \.
 
 
 --
--- TOC entry 3685 (class 0 OID 18834)
+-- TOC entry 3693 (class 0 OID 18834)
 -- Dependencies: 228
 -- Data for Name: interviews; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.interviews (interview_id, application_id, interview_date, interviewer, notes, outcome) FROM stdin;
-16	7	2024-10-25 15:20:00+04	Amir	sfddasdfa	Pending
-17	7	2024-10-24 15:48:00+04	Fawad	Come on time	Pending
+89	134	2024-11-12 08:24:00+04	Fawad Khan	asdfasdf	Passed
 \.
 
 
 --
--- TOC entry 3687 (class 0 OID 18848)
+-- TOC entry 3695 (class 0 OID 18848)
 -- Dependencies: 230
 -- Data for Name: job_offers; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.job_offers (offer_id, application_id, offer_details, offered_on, status) FROM stdin;
+COPY public.job_offers (offer_id, application_id, offer_details, offered_on, status, signed_on, token, hourly_pay_rate, payment_period, fixed_pay, travel_expense, role_offered) FROM stdin;
+77	134	\N	2024-11-11 07:24:26.61502+04	Accepted	2024-11-11 07:25:09.524+04	7dca5a1745b59ba2bd84230a51fef86e	20.00	Monthly	40.00	60.00	Staff
 \.
 
 
 --
--- TOC entry 3679 (class 0 OID 18783)
+-- TOC entry 3687 (class 0 OID 18783)
 -- Dependencies: 222
 -- Data for Name: jobs; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.jobs (job_id, company_id, title, description, location, status, created_at, updated_at, start_date, end_date, is_ongoing) FROM stdin;
-20	31	Web Developer	This is a web developer job	England	Open	2024-10-16 14:07:30.997095+04	2024-10-16 14:07:30.997095+04	2024-10-16	\N	t
+30	36	Security Guard	This is just a description	England	Open	2024-11-01 14:37:50.483809+04	2024-11-04 08:45:23.668901+04	2024-11-01	\N	t
 \.
 
 
 --
--- TOC entry 3673 (class 0 OID 18741)
+-- TOC entry 3681 (class 0 OID 18741)
 -- Dependencies: 216
 -- Data for Name: roles; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -503,73 +543,75 @@ COPY public.roles (role_id, role_name) FROM stdin;
 
 
 --
--- TOC entry 3675 (class 0 OID 18750)
+-- TOC entry 3683 (class 0 OID 18750)
 -- Dependencies: 218
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.users (id, email, password, updated_at, created_at, role_id, company_id) FROM stdin;
-31	itsamirkhan@outlook.com	$2a$10$.P/Kth5SkSNnj6NO6Ayv5u8v0bR9byywZPgQZPUUAOjiofc0lfOEq	2024-10-15 16:31:58.560181+04	2024-10-15 16:31:58.560181+04	1	30
-32	faizi@gmail.com	$2a$10$erSsNOtwtlOPgshycHAcK.A5Jh/JiZWrik2lZZew8jKIkjkBZKfvS	2024-10-15 16:32:17.887078+04	2024-10-15 16:32:17.887078+04	1	31
+COPY public.users (id, email, password, updated_at, created_at, role_id, company_id, user_pin, is_main_user, is_active, applicant_id, is_deleted) FROM stdin;
+58	anjum@gmail.com	$2a$10$aRzkClIVzJKX0TaYynfYOuF8RMJL34N43YyV4KoNqpKx0UgnA/hF2	2024-11-11 07:26:01.490295+04	2024-11-11 07:26:01.490295+04	1	48	70846	t	t	\N	f
+59	ahsan@gmail.com	$2a$10$.qhgzkyaaY70lSvFWSSzQe./Tm0LR9rWEerz0Jg3GBqH66CsTroQC	2024-11-11 09:47:28.50871+04	2024-11-11 09:47:28.50871+04	1	49	71151	t	t	\N	f
+57	itsamirkhan4@outlook.com	$2a$10$BAZ7RkL/w8vj.zTbEYQjWuM5R8G.H2L2bO3Pe45PwmyVcaMQ6/B4.	2024-11-11 07:25:09.64525+04	2024-11-11 07:25:09.64525+04	3	36	23964	f	t	168	f
+37	faizi@gmail.com	$2a$10$I/g9TYt8J4up7fN2JaeQOeEFXHfTHMrq5koYGuhCK7.i5SyGt9LSu	2024-11-01 09:44:37.34746+04	2024-11-01 09:44:37.34746+04	1	36	45408	t	t	\N	f
 \.
 
 
 --
--- TOC entry 3701 (class 0 OID 0)
+-- TOC entry 3709 (class 0 OID 0)
 -- Dependencies: 223
 -- Name: applicants_applicant_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.applicants_applicant_id_seq', 16, true);
+SELECT pg_catalog.setval('public.applicants_applicant_id_seq', 169, true);
 
 
 --
--- TOC entry 3702 (class 0 OID 0)
+-- TOC entry 3710 (class 0 OID 0)
 -- Dependencies: 225
 -- Name: applications_application_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.applications_application_id_seq', 7, true);
+SELECT pg_catalog.setval('public.applications_application_id_seq', 135, true);
 
 
 --
--- TOC entry 3703 (class 0 OID 0)
+-- TOC entry 3711 (class 0 OID 0)
 -- Dependencies: 219
 -- Name: companies_company_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.companies_company_id_seq', 31, true);
+SELECT pg_catalog.setval('public.companies_company_id_seq', 49, true);
 
 
 --
--- TOC entry 3704 (class 0 OID 0)
+-- TOC entry 3712 (class 0 OID 0)
 -- Dependencies: 227
 -- Name: interviews_interview_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.interviews_interview_id_seq', 17, true);
+SELECT pg_catalog.setval('public.interviews_interview_id_seq', 89, true);
 
 
 --
--- TOC entry 3705 (class 0 OID 0)
+-- TOC entry 3713 (class 0 OID 0)
 -- Dependencies: 229
 -- Name: job_offers_offer_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.job_offers_offer_id_seq', 1, false);
+SELECT pg_catalog.setval('public.job_offers_offer_id_seq', 77, true);
 
 
 --
--- TOC entry 3706 (class 0 OID 0)
+-- TOC entry 3714 (class 0 OID 0)
 -- Dependencies: 221
 -- Name: jobs_job_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.jobs_job_id_seq', 20, true);
+SELECT pg_catalog.setval('public.jobs_job_id_seq', 30, true);
 
 
 --
--- TOC entry 3707 (class 0 OID 0)
+-- TOC entry 3715 (class 0 OID 0)
 -- Dependencies: 215
 -- Name: roles_role_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -578,16 +620,16 @@ SELECT pg_catalog.setval('public.roles_role_id_seq', 3, true);
 
 
 --
--- TOC entry 3708 (class 0 OID 0)
+-- TOC entry 3716 (class 0 OID 0)
 -- Dependencies: 217
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.users_id_seq', 32, true);
+SELECT pg_catalog.setval('public.users_id_seq', 59, true);
 
 
 --
--- TOC entry 3512 (class 2606 OID 18808)
+-- TOC entry 3519 (class 2606 OID 18808)
 -- Name: applicants applicants_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -596,7 +638,7 @@ ALTER TABLE ONLY public.applicants
 
 
 --
--- TOC entry 3514 (class 2606 OID 18806)
+-- TOC entry 3521 (class 2606 OID 18806)
 -- Name: applicants applicants_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -605,7 +647,7 @@ ALTER TABLE ONLY public.applicants
 
 
 --
--- TOC entry 3516 (class 2606 OID 18822)
+-- TOC entry 3523 (class 2606 OID 18822)
 -- Name: applications applications_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -614,7 +656,7 @@ ALTER TABLE ONLY public.applications
 
 
 --
--- TOC entry 3508 (class 2606 OID 18776)
+-- TOC entry 3515 (class 2606 OID 18776)
 -- Name: companies companies_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -623,7 +665,7 @@ ALTER TABLE ONLY public.companies
 
 
 --
--- TOC entry 3518 (class 2606 OID 18841)
+-- TOC entry 3525 (class 2606 OID 18841)
 -- Name: interviews interviews_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -632,7 +674,7 @@ ALTER TABLE ONLY public.interviews
 
 
 --
--- TOC entry 3520 (class 2606 OID 18857)
+-- TOC entry 3527 (class 2606 OID 18857)
 -- Name: job_offers job_offers_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -641,7 +683,7 @@ ALTER TABLE ONLY public.job_offers
 
 
 --
--- TOC entry 3510 (class 2606 OID 18793)
+-- TOC entry 3517 (class 2606 OID 18793)
 -- Name: jobs jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -650,7 +692,7 @@ ALTER TABLE ONLY public.jobs
 
 
 --
--- TOC entry 3500 (class 2606 OID 18746)
+-- TOC entry 3505 (class 2606 OID 18746)
 -- Name: roles roles_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -659,7 +701,7 @@ ALTER TABLE ONLY public.roles
 
 
 --
--- TOC entry 3502 (class 2606 OID 18748)
+-- TOC entry 3507 (class 2606 OID 18748)
 -- Name: roles roles_role_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -668,7 +710,7 @@ ALTER TABLE ONLY public.roles
 
 
 --
--- TOC entry 3504 (class 2606 OID 18762)
+-- TOC entry 3509 (class 2606 OID 18762)
 -- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -677,7 +719,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3506 (class 2606 OID 18760)
+-- TOC entry 3511 (class 2606 OID 18760)
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -686,7 +728,16 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3524 (class 2606 OID 18809)
+-- TOC entry 3513 (class 2606 OID 18903)
+-- Name: users users_user_pin_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_user_pin_key UNIQUE (user_pin);
+
+
+--
+-- TOC entry 3532 (class 2606 OID 18809)
 -- Name: applicants applicants_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -695,7 +746,7 @@ ALTER TABLE ONLY public.applicants
 
 
 --
--- TOC entry 3525 (class 2606 OID 18828)
+-- TOC entry 3533 (class 2606 OID 18828)
 -- Name: applications applications_applicant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -704,7 +755,7 @@ ALTER TABLE ONLY public.applications
 
 
 --
--- TOC entry 3526 (class 2606 OID 18823)
+-- TOC entry 3534 (class 2606 OID 18823)
 -- Name: applications applications_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -713,7 +764,7 @@ ALTER TABLE ONLY public.applications
 
 
 --
--- TOC entry 3527 (class 2606 OID 18842)
+-- TOC entry 3535 (class 2606 OID 18842)
 -- Name: interviews interviews_application_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -722,7 +773,7 @@ ALTER TABLE ONLY public.interviews
 
 
 --
--- TOC entry 3528 (class 2606 OID 18858)
+-- TOC entry 3536 (class 2606 OID 18858)
 -- Name: job_offers job_offers_application_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -731,7 +782,7 @@ ALTER TABLE ONLY public.job_offers
 
 
 --
--- TOC entry 3523 (class 2606 OID 18794)
+-- TOC entry 3531 (class 2606 OID 18794)
 -- Name: jobs jobs_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -740,7 +791,16 @@ ALTER TABLE ONLY public.jobs
 
 
 --
--- TOC entry 3521 (class 2606 OID 18777)
+-- TOC entry 3528 (class 2606 OID 27102)
+-- Name: users users_applicant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_applicant_id_fkey FOREIGN KEY (applicant_id) REFERENCES public.applicants(applicant_id);
+
+
+--
+-- TOC entry 3529 (class 2606 OID 18777)
 -- Name: users users_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -749,7 +809,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3522 (class 2606 OID 18764)
+-- TOC entry 3530 (class 2606 OID 18764)
 -- Name: users users_role_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -757,7 +817,7 @@ ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(role_id);
 
 
--- Completed on 2024-10-16 16:00:21 PKT
+-- Completed on 2024-11-11 18:29:02 PKT
 
 --
 -- PostgreSQL database dump complete

@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import jobRoutes from './routes/jobRoutes';
 import applicantRoutes from './routes/applicantRoutes';
+import employeeRoutes from './routes/employeeRoutes';
+import path from 'path';
 
 dotenv.config();
 const app: Express = express();
@@ -14,6 +16,10 @@ app.use(bodyParser.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applicants', applicantRoutes);
+app.use('/api', employeeRoutes);
+
+app.use('/uploads', express.static(path.join(__dirname, '../src/uploads')));
+
 
 app.get('/', (req: Request, res: Response) => {
   res.status(200).send("Welcome to the Security App API!");

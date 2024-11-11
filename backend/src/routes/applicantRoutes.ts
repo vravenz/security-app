@@ -20,6 +20,8 @@ router.get('/passed/:companyId', applicationController.getPassedApplicantsByComp
 router.get('/interviews/:companyId', interviewController.getInterviewsByCompanyId);
 router.post('/interviews/:applicationId', interviewController.createInterview);
 router.put('/interviews/outcome/:interviewId', interviewController.updateInterviewOutcome);
+router.patch('/revert-status/:applicationId', applicationController.revertApplicationStatus);
+router.delete('/interviews/:interviewId', interviewController.deleteInterview);
 
 // Job offer-related routes
 router.post('/send-offer/:applicationId', jobOfferController.sendJobOffer);

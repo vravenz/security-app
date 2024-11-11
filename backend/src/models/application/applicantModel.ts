@@ -78,10 +78,12 @@ export const createApplicantAndApplication = async (
 // Find Applications
 export const findApplicationsByCompanyId = async (companyId: number) => {
     const query = `
-        SELECT applications.*, jobs.title AS job_title, applicants.first_name, applicants.last_name
+        SELECT applications.*, jobs.title AS job_title, applicants.first_name, applicants.middle_name, applicants.last_name, applicants.employee_photo,
+               job_offers.status AS offer_status
         FROM applications
-        JOIN jobs ON applications.job_id = jobs.job_id
-        JOIN applicants ON applications.applicant_id = applicants.applicant_id
+        LEFT JOIN jobs ON applications.job_id = jobs.job_id
+        LEFT JOIN applicants ON applications.applicant_id = applicants.applicant_id
+        LEFT JOIN job_offers ON applications.application_id = job_offers.application_id
         WHERE jobs.company_id = $1;
     `;
     const { rows } = await pool.query(query, [companyId]);
@@ -137,6 +139,7 @@ export const updateApplicationStatus = async (applicationId: number, status: str
         WHERE application_id = $2
         RETURNING *;
     `;
-    const { rows } = await pool.query(query, [status, applicationId]);
-    return rows[0];
+    const values = [status, applicationId];
+    const result = await pool.query(query, values);
+    return result.rows[0];
 };

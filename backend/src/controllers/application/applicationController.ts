@@ -80,3 +80,14 @@ export const getPassedApplicantsByCompanyId = async (req: Request, res: Response
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 };
+
+export const revertApplicationStatus = async (req: Request, res: Response) => {
+    const { applicationId } = req.params;
+    try {
+        const updatedApplication = await ApplicantModel.updateApplicationStatus(parseInt(applicationId), 'Submitted');
+        res.status(200).json(updatedApplication);
+    } catch (error: any) {
+        console.error("Failed to revert application status:", error);
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+};

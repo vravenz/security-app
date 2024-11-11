@@ -25,9 +25,10 @@ const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     const hashedPassword = await hashPassword(password);
-    const newUser = await createUser(email, hashedPassword, newCompany.company_id!, "Super Admin"); // Default role
+    // Pass true for isMainUser since this is the main user registration
+    const newUser = await createUser(email, hashedPassword, newCompany.company_id!, "Super Admin", true);
 
-    delete newUser.password;
+    delete newUser.password; // Ensure password is not sent back in response
     res.status(201).json({
       ...newUser,
       message: "User registered successfully. Use your email or the provided PIN to log in.",
