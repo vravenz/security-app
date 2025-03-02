@@ -36,7 +36,8 @@ export const createJobOffer = async (
     fixedPay: number,
     travelExpense: number,
     applicantEmail: string,
-    roleOffered: string // New parameter
+    roleOffered: string,
+    branchId: number  // New parameter for branch ID
 ) => {
     const client = await pool.connect();
     try {
@@ -44,11 +45,11 @@ export const createJobOffer = async (
 
         const uniqueToken = crypto.randomBytes(16).toString('hex');
         const insertOfferQuery = `
-            INSERT INTO job_offers (application_id, offer_details, hourly_pay_rate, payment_period, fixed_pay, travel_expense, status, token, role_offered)
-            VALUES ($1, $2, $3, $4, $5, $6, 'Offered', $7, $8)
+            INSERT INTO job_offers (application_id, offer_details, hourly_pay_rate, payment_period, fixed_pay, travel_expense, status, token, role_offered, branch_id)
+            VALUES ($1, $2, $3, $4, $5, $6, 'Offered', $7, $8, $9)
             RETURNING offer_id;
         `;
-        const offerValues = [applicationId, offerDetails, hourlyPayRate, paymentPeriod, fixedPay, travelExpense, uniqueToken, roleOffered];
+        const offerValues = [applicationId, offerDetails, hourlyPayRate, paymentPeriod, fixedPay, travelExpense, uniqueToken, roleOffered, branchId];
         const offerResult = await client.query(insertOfferQuery, offerValues);
         const offerId = offerResult.rows[0].offer_id;
 
@@ -145,10 +146,11 @@ export const updateJobStatus = async (jobId: number, status: string) => {
     return result.rows[0];
 };
 
+// This is for to insert the data from job offer to the users table for applicants
 export const getJobOfferById = async (offerId: number) => {
     const query = `
         SELECT offer_id, application_id, offer_details, offered_on, status, signed_on,
-               hourly_pay_rate, payment_period, fixed_pay, travel_expense, role_offered
+               hourly_pay_rate, payment_period, fixed_pay, travel_expense, role_offered, branch_id
         FROM job_offers
         WHERE offer_id = $1;
     `;

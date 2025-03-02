@@ -8,6 +8,9 @@ import * as jobOfferController from '../controllers/job/jobController';
 
 const router = express.Router();
 
+// Route to submit an applicant directly by admin or staff, optionally linked to a job.
+router.post('/add-applicant', upload.single('employee_photo'), applicationController.submitApplicant);
+
 // Application-related routes
 router.post('/submit', upload.single('employee_photo'), applicationController.submitApplication);
 router.get('/:companyId', applicationController.getApplicationsByCompanyId);

@@ -7,7 +7,7 @@ import { sendLoginCredentialsEmail } from '../../utils/emailService';
 
 export const sendJobOffer = async (req: Request, res: Response) => {
     const applicationId = parseInt(req.params.applicationId);
-    const { offerDetails, hourlyPayRate, paymentPeriod, fixedPay, travelExpense, roleOffered } = req.body;
+    const { offerDetails, hourlyPayRate, paymentPeriod, fixedPay, travelExpense, roleOffered, branchId } = req.body;
 
     try {
         const application = await ApplicantModel.findApplicationById(applicationId);
@@ -16,7 +16,24 @@ export const sendJobOffer = async (req: Request, res: Response) => {
             return;
         }
 
-        const jobOffer = await JobModel.createJobOffer(applicationId, offerDetails, hourlyPayRate, paymentPeriod, fixedPay, travelExpense, application.email, roleOffered);
+        // Ensure branchId is passed and parsed as a number
+        if (!branchId) {
+            res.status(400).json({ error: "Branch ID is required" });
+            return;
+        }
+        const parsedBranchId = parseInt(branchId);
+
+        const jobOffer = await JobModel.createJobOffer(
+            applicationId, 
+            offerDetails, 
+            hourlyPayRate, 
+            paymentPeriod, 
+            fixedPay, 
+            travelExpense, 
+            application.email, 
+            roleOffered, 
+            parsedBranchId // Now including branchId in the function call
+        );
         await ApplicantModel.updateApplicationStatus(applicationId, 'Offered');
 
         res.status(201).json({ message: "Job offer sent successfully", jobOffer });
@@ -75,23 +92,40 @@ export const handleJobOfferResponse = async (req: Request, res: Response) => {
                     const applicant = await ApplicantModel.findApplicationById(jobOffer.application_id);
                     if (!applicant || !applicant.email) throw new Error("Applicant or email not found.");
 
-                    const email = applicant.email;
-                    const roleOffered = jobOffer.role_offered;
-                    const applicantId = applicant.applicant_id;
+                    const { email, applicant_id: applicantId } = applicant;
+                    const { role_offered: roleOffered, branch_id: branchId } = jobOffer;
 
+                    if (branchId === undefined) {
+                        console.error("Branch ID is undefined in job offer details:", jobOffer);
+                        throw new Error("Branch ID is undefined. Check the job offer retrieval process.");
+                    }
 
                     // Generate a random 6-character alphanumeric password
                     const generatedPassword = Math.random().toString(36).slice(-6);
                     const hashedPassword = await hashPassword(generatedPassword);
 
-                    // Create user with the applicant's email, generated password, and role
-                    const newUser = await createUser(email, hashedPassword, applicant.company_id, roleOffered, false, applicantId);
+                    // Create user with the applicant's email, generated password, role, and branch ID
+                    const newUser = await createUser(
+                        email,
+                        hashedPassword,
+                        applicant.company_id,
+                        roleOffered,
+                        false,             // isMainUser
+                        applicantId,
+                        true,              // isActive
+                        false,             // isDeleted
+                        false,             // isDormant
+                        false,             // isSubcontractorEmployee (explicitly false since not a subcontractor submission)
+                        false,             // isSubcontractor (false because this is not from a subcontractor)
+                        branchId
+                    );
+                    
                     if (!newUser.user_pin) throw new Error("Failed to generate user PIN.");
-
+                    
                     // Send login credentials to applicant
                     await sendLoginCredentialsEmail(email, newUser.user_pin, generatedPassword);
 
-                    console.log(`Created user for applicant ${email} with role ${roleOffered}.`);
+                    console.log(`Created user for applicant ${email} with role ${roleOffered} at branch ID ${branchId}. Email sent.`);
                 } catch (backgroundError) {
                     console.error("Background process failed:", backgroundError);
                 }
@@ -110,6 +144,7 @@ export const handleJobOfferResponse = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 };
+
 
 export const getJobOffers = async (req: Request, res: Response) => {
     try {

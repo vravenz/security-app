@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 export const sendJobOfferEmail = async (to: string, offerUrl: string, offerDetails: string) => {
     try {
         const mailOptions = {
-            from: '"vravenz" <info@vravenz.com>',
+            from: '"Krypton FM Group" <info@vravenz.com>',
             to,
             subject: 'Job Offer from Your Krypton FM Group',
             html: `
@@ -41,11 +41,11 @@ export const sendJobOfferEmail = async (to: string, offerUrl: string, offerDetai
 export const sendLoginCredentialsEmail = async (to: string, userPin: string, password: string) => {
     try {
         const mailOptions = {
-            from: '"vravenz" <info@vravenz.com>',
+            from: '"Krypton FM Group" <info@vravenz.com>',
             to,
             subject: 'Your Login Credentials for Krypton FM Group',
             html: `
-                <h3>Welcome to vravenz!</h3>
+                <h3>Welcome to Krypton FM Group!</h3>
                 <p>Your job offer has been accepted. Below are your login details:</p>
                 <p><strong>Email:</strong> ${to}</p>
                 <p><strong>User PIN:</strong> ${userPin}</p>
