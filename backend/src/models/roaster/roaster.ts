@@ -26,7 +26,7 @@ export interface Roaster {
 }
 
 /**
- * Insert a new roaster record into the database.
+ * Insert a new roaster record.
  */
 export const insertRoaster = async (roaster: Roaster): Promise<Roaster> => {
   const {
@@ -101,39 +101,74 @@ export const insertRoaster = async (roaster: Roaster): Promise<Roaster> => {
     console.error('Error inserting new roaster:', error);
     throw error;
   }
-}
+};
 
 /**
- * Fetch a single roaster record by its roaster_id.
+ * Fetch a single roaster by ID, including employees and shifts.
  */
-export const fetchRoasterById = async (roasterId: number): Promise<Roaster | null> => {
+export const fetchRoasterById = async (roasterId: number): Promise<any | null> => {
   try {
     const query = `
       SELECT
-        roaster_id,
-        company_id,
-        client_name,
-        site_name,
-        duty_type,
-        payable_rate_type,
-        payable_role,
-        payable_amount,
-        payable_expenses,
-        billable_role,
-        billable_amount,
-        billable_expenses,
-        unpaid_shift,
-        training_shift,
-        shift_status,
-        po_number,
-        penalty,
-        comments,
-        shift_instruction,
-        created_at,
-        updated_at
-      FROM roaster
-      WHERE roaster_id = $1
-      LIMIT 1;
+        r.roaster_id,
+        r.company_id,
+        r.client_name,
+        r.site_name,
+        r.duty_type,
+        r.payable_rate_type,
+        r.payable_role,
+        r.payable_amount,
+        r.payable_expenses,
+        r.billable_role,
+        r.billable_amount,
+        r.billable_expenses,
+        r.unpaid_shift,
+        r.training_shift,
+        r.shift_status,
+        r.po_number,
+        r.penalty,
+        r.comments,
+        r.shift_instruction,
+        r.created_at,
+        r.updated_at,
+
+        -- Fetch the assigned employees (without subcontractor company details)
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'roaster_employee_id', re.roaster_employee_id,
+              'staff', re.staff,
+              'guard_group', re.guard_group,
+              'subcontractor', re.subcontractor,
+              'applicant_id', re.applicant_id,
+              'first_name', a.first_name,
+              'last_name', a.last_name,
+              'employee_photo', a.employee_photo,
+              'is_subcontractor_employee', CASE WHEN re.subcontractor IS NOT NULL THEN true ELSE false END
+            )
+          ) FILTER (WHERE re.roaster_employee_id IS NOT NULL),
+          '[]'
+        ) AS "selectedEmployees",
+
+        -- Fetch the assigned shifts
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'shift_date', rs.shift_date,
+              'start_time', rs.start_time,
+              'end_time', rs.end_time,
+              'break_time', rs.break_time
+            )
+          ) FILTER (WHERE rs.shift_date IS NOT NULL),
+          '[]'
+        ) AS "selectedShifts"
+
+      FROM roaster r
+      LEFT JOIN roaster_employees re ON re.roaster_id = r.roaster_id
+      LEFT JOIN roaster_shifts rs ON rs.roaster_employee_id = re.roaster_employee_id
+      LEFT JOIN applicants a ON a.applicant_id = re.applicant_id
+      WHERE r.roaster_id = $1
+      GROUP BY r.roaster_id
     `;
     const { rows } = await pool.query(query, [roasterId]);
     if (rows.length === 0) {
@@ -144,13 +179,15 @@ export const fetchRoasterById = async (roasterId: number): Promise<Roaster | nul
     console.error('Error fetching roaster by ID:', error);
     throw error;
   }
-}
+};
 
 /**
- * Update an existing roaster record by roaster_id.
+ * Update the roaster record.
  */
-export const updateRoasterInDB = async (roasterId: number, data: Partial<Roaster>): Promise<Roaster> => {
-  // The columns you want to update
+export const updateRoasterInDB = async (
+  roasterId: number, 
+  data: Partial<Roaster>
+): Promise<Roaster> => {
   const {
     client_name,
     site_name,
@@ -226,7 +263,7 @@ export const updateRoasterInDB = async (roasterId: number, data: Partial<Roaster
     console.error('Error updating roaster in DB:', error);
     throw error;
   }
-}
+};
 
 // ---------------------
 // RoasterEmployee
@@ -235,11 +272,14 @@ export interface RoasterEmployee {
   roaster_employee_id?: number;
   roaster_id?: number;
   applicant_id: number | null;
-  staff?: string;
+  staff?: string;  // "Employee" or "unassigned"
   guard_group?: number | null;
   subcontractor?: number | null;
 }
 
+/**
+ * Insert new roaster employees in bulk.
+ */
 export const insertRoasterEmployees = async (
   roasterId: number,
   roasterEmployees: RoasterEmployee[]
@@ -277,7 +317,6 @@ export const insertRoasterEmployees = async (
   });
 
   const finalQuery = insertQuery + valuesClause.join(', ') + ' RETURNING *';
-
   try {
     const result = await pool.query(finalQuery, parameters);
     return result.rows;
@@ -287,17 +326,33 @@ export const insertRoasterEmployees = async (
   }
 };
 
+/**
+ * Delete all roaster employees for a given roaster_id.
+ */
+export const deleteRoasterEmployees = async (roasterId: number): Promise<void> => {
+  const query = 'DELETE FROM roaster_employees WHERE roaster_id = $1;';
+  try {
+    await pool.query(query, [roasterId]);
+  } catch (error) {
+    console.error('Error deleting roaster employees:', error);
+    throw error;
+  }
+};
+
 // ---------------------
 // RoasterShift
 // ---------------------
 export interface RoasterShift {
   roaster_employee_id?: number;
-  shift_date: string;
-  start_time: string;
-  end_time: string;
-  break_time?: string | null;
+  shift_date: string;   // e.g. "2023-02-10"
+  start_time: string;   // e.g. "09:00"
+  end_time: string;     // e.g. "17:00"
+  break_time?: string | null; // e.g. "00:30:00"
 }
 
+/**
+ * Insert multiple shifts for employees in bulk.
+ */
 export const insertMultipleShiftsForEmployees = async (
   shifts: RoasterShift[]
 ): Promise<void> => {
@@ -344,6 +399,23 @@ export const insertMultipleShiftsForEmployees = async (
 };
 
 /**
+ * Delete all roaster shifts for a given list of roaster_employee_ids.
+ */
+export const deleteShiftsForEmployees = async (roasterEmployeeIds: number[]): Promise<void> => {
+  if (roasterEmployeeIds.length === 0) return;
+  const query = `
+    DELETE FROM roaster_shifts
+    WHERE roaster_employee_id = ANY ($1)
+  `;
+  try {
+    await pool.query(query, [roasterEmployeeIds]);
+  } catch (error) {
+    console.error('Error deleting roaster shifts:', error);
+    throw error;
+  }
+};
+
+/**
  * Fetch all roasters with joined employees and shifts.
  */
 export const fetchAllRoasters = async (): Promise<any[]> => {
@@ -361,12 +433,9 @@ export const fetchAllRoasters = async (): Promise<any[]> => {
         rs.start_time,
         rs.end_time
       FROM roaster AS r
-      JOIN roaster_employees AS re
-        ON r.roaster_id = re.roaster_id
-      JOIN roaster_shifts AS rs
-        ON re.roaster_employee_id = rs.roaster_employee_id
-      LEFT JOIN applicants AS a
-        ON re.applicant_id = a.applicant_id
+      JOIN roaster_employees AS re ON r.roaster_id = re.roaster_id
+      JOIN roaster_shifts AS rs ON re.roaster_employee_id = rs.roaster_employee_id
+      LEFT JOIN applicants AS a ON a.applicant_id = re.applicant_id
       ORDER BY r.roaster_id, re.roaster_employee_id, rs.shift_date, rs.start_time;
     `;
     const { rows } = await pool.query(query);
