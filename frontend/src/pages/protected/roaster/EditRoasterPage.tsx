@@ -14,7 +14,7 @@ import Button from '../../../components/Button';
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../hooks/useAuth';
 
-// Custom hooks
+// Custom hooks for form and data fetching.
 import { useRoasterFormData } from './formData/useRoasterFormData';
 import { useFetchClients } from './useFetchClients';
 import { useFetchSites } from './useFetchSites';
@@ -22,12 +22,15 @@ import { useExtendedFields } from './useExtendedFields';
 import { useFetchGuardGroups } from './useFetchGuardGroups';
 import { useFetchEmployees } from './useFetchEmployees';
 
-// Components
+// Components for employee selection and shift display.
 import EmployeeDropdown from '../../../components/EmployeeDropdown';
 import ShiftsComponent from '../../../components/ShiftsComponent';
 
+// Define interfaces for our entities.
 interface Employee {
   applicant_id: number | null;
+  // roster_employee_id is from roster_employees table.
+  roster_employee_id?: number;
   first_name?: string;
   last_name?: string;
   employee_photo?: string | null;
@@ -84,7 +87,7 @@ const EditRosterShiftPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
-  // Destructure auth info; note we now use companyId and userId directly.
+  // Retrieve company and user IDs from auth context.
   const { companyId, userId } = useAuth();
 
   // Local state for loading, messages, and fetched data.
@@ -94,24 +97,24 @@ const EditRosterShiftPage: React.FC = () => {
   const [shiftData, setShiftData] = useState<RosterShift | null>(null);
   const [assignmentData, setAssignmentData] = useState<RosterShiftAssignment | null>(null);
 
-  // For removal flow.
+  // States for handling removal of the currently assigned employee.
   const [showRemovalReason, setShowRemovalReason] = useState<boolean>(false);
   const [removalReason, setRemovalReason] = useState<string>('');
 
-  // Main form state.
+  // Main form state from custom hook.
   const { formData, setFormData } = useRoasterFormData();
 
-  // Data fetching hooks.
+  // Data fetching hooks for clients, sites, guard groups, and employees.
   const { clients, fetchClients } = useFetchClients();
   const { sites, fetchSites, selectedSiteDetails, handleSelectSite } = useFetchSites();
   const { guardGroups, fetchGuardGroups } = useFetchGuardGroups(companyId);
   const guardGroupId = Number(formData.guard_group) || 0;
   const { employees, fetchEmployees } = useFetchEmployees(companyId, guardGroupId);
 
-  // The currently assigned employee (if any).
+  // State for the currently selected employee.
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-  // Generate extended fields but exclude 'select_staff' so it isn’t duplicated.
+  // Generate extended fields for the form and exclude 'select_staff' to avoid duplication.
   const extendedFields = useExtendedFields({
     formData,
     setFormData,
@@ -122,12 +125,13 @@ const EditRosterShiftPage: React.FC = () => {
     isEditMode: true,
   });
 
+  // Group form fields for display in different cards.
   const card2Names = ['payable_rate_type', 'payable_role', 'payable_amount', 'payable_expenses', 'unpaid_shift'];
   const card3Names = ['billable_role', 'billable_amount', 'billable_expenses', 'training_shift'];
   const card4Names = ['penalty', 'comments', 'shift_instruction'];
   const allCard2_3_4 = [...card2Names, ...card3Names, ...card4Names];
 
-  // Exclude "select_staff" from card1Fields to avoid duplication.
+  // Fields to display in the first card (excluding select_staff).
   const card1Fields = extendedFields.filter(
     (field) => !allCard2_3_4.includes(field.name) && field.name !== 'select_staff'
   );
@@ -135,30 +139,33 @@ const EditRosterShiftPage: React.FC = () => {
   const card3Fields = extendedFields.filter((field) => card3Names.includes(field.name));
   const card4Fields = extendedFields.filter((field) => card4Names.includes(field.name));
 
-  // -------------------- INITIAL LOAD & FETCHES --------------------
+  // -------------------- INITIAL LOAD & DATA FETCHING --------------------
   useEffect(() => {
     if (!companyId) {
       setLoading(false);
       return;
     }
+    // Set the company ID in form data and load clients and guard groups.
     setFormData((prev) => ({ ...prev, company_id: companyId }));
     fetchClients(companyId);
     fetchGuardGroups();
   }, [companyId, setFormData, fetchClients, fetchGuardGroups]);
 
   useEffect(() => {
+    // When client_id changes, fetch the sites.
     if (formData.client_id) {
       fetchSites(formData.client_id);
     }
   }, [formData.client_id, fetchSites]);
 
   useEffect(() => {
+    // When company and guard group are available, fetch employees.
     if (companyId && guardGroupId) {
       fetchEmployees();
     }
   }, [companyId, guardGroupId, fetchEmployees]);
 
-  // Fetch the shift details using the shift id.
+  // Fetch shift, roster, and assignment details.
   useEffect(() => {
     if (!id) {
       setMessage('No valid shift ID provided.');
@@ -167,10 +174,11 @@ const EditRosterShiftPage: React.FC = () => {
     }
     const fetchShiftData = async () => {
       try {
-        // 1. Fetch the shift.
+        // 1. Fetch the shift details.
         const shiftRes = await axios.get(`http://localhost:4000/api/rostershifts/${id}`);
         const shift = shiftRes.data;
         setShiftData(shift);
+        // Update the form data with the shift details.
         setFormData((prev) => ({
           ...prev,
           payable_rate_type: shift.payable_rate_type,
@@ -192,7 +200,7 @@ const EditRosterShiftPage: React.FC = () => {
           break_time: shift.break_time || '',
         }));
 
-        // 2. Fetch the parent roster.
+        // 2. Fetch the parent roster details.
         const rosterRes = await axios.get(`http://localhost:4000/api/rosters/${shift.roster_id}`);
         const roster = rosterRes.data.roster;
         setRosterData(roster);
@@ -204,7 +212,7 @@ const EditRosterShiftPage: React.FC = () => {
           site_id: roster.site_id,
         }));
 
-        // 3. Fetch assignment(s) for this shift and filter out removed ones.
+        // 3. Fetch assignment records for this shift and ignore those marked as 'removed'.
         const assignRes = await axios.get(`http://localhost:4000/api/rostershiftassignments/shift/${id}`);
         const assignments = assignRes.data;
         if (assignments && assignments.length > 0) {
@@ -232,7 +240,7 @@ const EditRosterShiftPage: React.FC = () => {
     fetchShiftData();
   }, [id, companyId, setFormData]);
 
-  // When an assignment exists, fetch the detailed employee record.
+  // If an assignment exists, fetch the detailed employee record.
   useEffect(() => {
     if (assignmentData && assignmentData.roster_employee_id) {
       axios
@@ -248,13 +256,14 @@ const EditRosterShiftPage: React.FC = () => {
   }, [assignmentData, setFormData]);
 
   // -------------------- HELPER FUNCTIONS --------------------
-  // Remove the currently assigned employee: show removal reason modal.
+
+  // Trigger removal modal for the current assignment.
   const handleRequestRemoveEmployee = () => {
     setShowRemovalReason(true);
     setRemovalReason('');
   };
 
-  // Confirm removal using the DELETE route.
+  // Confirm removal of the assigned employee.
   const handleConfirmRemoveEmployee = async () => {
     if (!assignmentData) {
       setSelectedEmployee(null);
@@ -263,7 +272,6 @@ const EditRosterShiftPage: React.FC = () => {
       return;
     }
     try {
-      // Send a DELETE request with a request body that includes company_id and removal_reason.
       await axios.delete(
         `http://localhost:4000/api/rostershiftassignments/${assignmentData.roster_shift_assignment_id}`,
         {
@@ -275,7 +283,6 @@ const EditRosterShiftPage: React.FC = () => {
         }
       );
   
-      // Clear assignment data on success.
       setAssignmentData(null);
       setSelectedEmployee(null);
       setFormData((prev) => ({ ...prev, select_staff: 'unassigned' }));
@@ -287,18 +294,19 @@ const EditRosterShiftPage: React.FC = () => {
       setShowRemovalReason(false);
       setRemovalReason('');
     }
-  };  
+  };
 
+  // Cancel removal process.
   const handleCancelRemove = () => {
     setShowRemovalReason(false);
     setRemovalReason('');
   };
 
-  // -------------------- SUBMIT HANDLER --------------------
+  // -------------------- FORM SUBMISSION HANDLER --------------------
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!companyId || userId === null) {
+    if (!companyId || !userId) {
       setMessage('User or Company ID is missing. Please re-login.');
       return;
     }
@@ -308,7 +316,7 @@ const EditRosterShiftPage: React.FC = () => {
     }
 
     try {
-      // 1. Update the shift record with header containing actual user id
+      // 1. Update the shift record.
       const shiftPayload = {
         company_id: companyId,
         roster_id: shiftData.roster_id,
@@ -337,17 +345,54 @@ const EditRosterShiftPage: React.FC = () => {
         { headers: { 'x-user-id': userId } }
       );
 
-      // 2. If there's a selected employee and no assignment exists, create one.
+      // 2. If a new employee is selected and there is no active assignment, create a new assignment.
       if (selectedEmployee && !assignmentData) {
+        let rosterEmployeeId = selectedEmployee.roster_employee_id;
+        if (!rosterEmployeeId) {
+          // For subcontractor employees, determine the subcontractor value:
+          let subcontractorValue = null;
+          if (selectedEmployee.is_subcontractor_employee) {
+            // Use the value entered in the form if available; otherwise use the existing value.
+            if (formData.subcontractor && formData.subcontractor.trim() !== "") {
+              subcontractorValue = parseInt(formData.subcontractor);
+            } else if (selectedEmployee.subcontractor_company_id) {
+              subcontractorValue = selectedEmployee.subcontractor_company_id;
+            }
+          }
+          console.log('Creating RosterEmployee with data:', {
+            company_id: companyId,
+            roster_id: shiftData.roster_id,
+            applicant_id: selectedEmployee.applicant_id,
+            staff: `${selectedEmployee.first_name || ''} ${selectedEmployee.last_name || ''}`.trim(),
+            guard_group: formData.guard_group ? parseInt(formData.guard_group) : null,
+            subcontractor: subcontractorValue,
+          });
+          const newRosterEmployeeResponse = await axios.post(
+            'http://localhost:4000/api/rosteremployees',
+            {
+              company_id: companyId,
+              roster_id: shiftData.roster_id,
+              applicant_id: selectedEmployee.applicant_id,
+              staff: `${selectedEmployee.first_name || ''} ${selectedEmployee.last_name || ''}`.trim(),
+              guard_group: formData.guard_group ? parseInt(formData.guard_group) : null,
+              subcontractor: subcontractorValue,
+            },
+            { headers: { 'x-user-id': userId } }
+          );
+          rosterEmployeeId = newRosterEmployeeResponse.data.roster_employee_id;
+          setSelectedEmployee({ ...selectedEmployee, roster_employee_id: rosterEmployeeId });
+        }
         const newAssignmentPayload = {
           company_id: companyId,
           roster_shift_id: shiftData.roster_shift_id,
-          roster_employee_id: selectedEmployee.applicant_id,
+          roster_employee_id: rosterEmployeeId,
           assignment_start_time: null,
           assignment_end_time: null,
           actual_worked_hours: null,
           assignment_status: 'active',
           employee_shift_status: 'unconfirmed',
+          comments: 'New employee assigned after removal',
+          change_reason: 'Reassignment after employee removal'
         };
         await axios.post(
           'http://localhost:4000/api/rostershiftassignments',
@@ -364,6 +409,7 @@ const EditRosterShiftPage: React.FC = () => {
     }
   };
 
+  // Memoize shift timing data for the ShiftsComponent.
   const memoizedShifts = useMemo(() => [{
     shift_date: formData.shift_date,
     scheduled_start_time: formData.scheduled_start_time,
@@ -376,7 +422,7 @@ const EditRosterShiftPage: React.FC = () => {
     formData.break_time
   ]);
 
-  // -------------------- RENDERING --------------------
+  // -------------------- RENDERING THE COMPONENT --------------------
   const mainContent = (
     <div className={`${theme === 'dark' ? 'text-dark-text' : 'text-light-text'}`}>
       {loading ? (
@@ -384,12 +430,12 @@ const EditRosterShiftPage: React.FC = () => {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            {/* LEFT/MIDDLE Column */}
+            {/* LEFT/MIDDLE Column: Shift & Roster Details */}
             <Card className="md:col-span-2 p-6 space-y-4">
               <h1 className="text-xl font-bold mb-4">Edit Shift</h1>
               {message && <p className="text-red-500">{message}</p>}
 
-              {/* Roster read-only fields */}
+              {/* Display read-only roster details */}
               <InputField
                 type="text"
                 name="client_name"
@@ -415,7 +461,7 @@ const EditRosterShiftPage: React.FC = () => {
                 onChange={() => {}}
               />
 
-              {/* Render additional card1 fields (excluding select_staff) */}
+              {/* Render additional form fields from extendedFields */}
               {card1Fields.map((field) => (
                 <InputField
                   key={field.name}
@@ -429,7 +475,7 @@ const EditRosterShiftPage: React.FC = () => {
                 />
               ))}
 
-              {/* Manually render "Select Staff" once */}
+              {/* Render Select Staff dropdown */}
               <InputField
                 type="select"
                 name="select_staff"
@@ -446,7 +492,7 @@ const EditRosterShiftPage: React.FC = () => {
                 }
               />
 
-              {/* If "Employee" is selected and no employee is assigned, show dropdown for guard group and employee */}
+              {/* If Employee is selected and no employee is assigned, show dropdowns for Guard Group and Employee */}
               {formData.select_staff === 'Employee' && !selectedEmployee && (
                 <div className="space-y-4">
                   <InputField
@@ -466,6 +512,7 @@ const EditRosterShiftPage: React.FC = () => {
                       employees={employees}
                       value={undefined}
                       onChange={(selectedId) => {
+                        // Find the employee record using the selected ID.
                         const emp = employees.find((e) => e.applicant_id === selectedId);
                         if (emp) {
                           setSelectedEmployee(emp);
@@ -476,7 +523,7 @@ const EditRosterShiftPage: React.FC = () => {
                 </div>
               )}
 
-              {/* If an employee is assigned, show their card with a remove button */}
+              {/* If an employee is already assigned, display their information with a remove button */}
               {selectedEmployee && (
                 <div className="mt-4 p-4 border-2 dark:border-zinc-700 border-dotted rounded">
                   <div className="flex items-center gap-4">
@@ -516,21 +563,21 @@ const EditRosterShiftPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Shift details: date is read-only, but times and break can be updated */}
+              {/* Display shift timing details */}
               <ShiftsComponent
-                  shifts={memoizedShifts}
-                  onShiftsChange={(newShifts) => {
-                    if (newShifts && newShifts.length > 0) {
-                      setFormData((prev) => ({ ...prev, ...newShifts[0] }));
-                    }
-                  }}
-                  disableDateEditing={true}
-                  disableShiftAddition={true}
-                  readOnly={true}
-                />
+                shifts={memoizedShifts}
+                onShiftsChange={(newShifts) => {
+                  if (newShifts && newShifts.length > 0) {
+                    setFormData((prev) => ({ ...prev, ...newShifts[0] }));
+                  }
+                }}
+                disableDateEditing={true}
+                disableShiftAddition={true}
+                readOnly={true}
+              />
             </Card>
 
-            {/* RIGHT Column */}
+            {/* RIGHT Column: Additional fields grouped by category */}
             <div className="flex flex-col space-y-2">
               <Card className="p-6 space-y-4">
                 <h2 className="text-lg font-bold mb-2 text-blue-600">Payable</h2>
@@ -547,7 +594,7 @@ const EditRosterShiftPage: React.FC = () => {
                   />
                 ))}
               </Card>
-              <Card className="p-6 space-y-2">
+              <Card className="p-6 space-y-4">
                 <h2 className="text-lg font-bold mb-2 text-green-600">Billable</h2>
                 {card3Fields.map((field) => (
                   <InputField
@@ -576,11 +623,21 @@ const EditRosterShiftPage: React.FC = () => {
                     options={field.options}
                   />
                 ))}
+                {/* Render an input field for subcontractor ID */}
+                <InputField
+                  type="text"
+                  name="subcontractor"
+                  value={formData.subcontractor || ''}
+                  label="Subcontractor ID"
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, subcontractor: e.target.value }))
+                  }
+                />
               </Card>
             </div>
           </div>
 
-          {/* Submit button */}
+          {/* Submit button to update shift */}
           <div className="flex justify-end">
             <Button type="submit" color="submit" icon="plus" marginRight="5px" size="small">
               Update Shift
@@ -589,7 +646,7 @@ const EditRosterShiftPage: React.FC = () => {
         </form>
       )}
 
-      {/* Removal Reason Modal */}
+      {/* Modal for removal reason when removing an assigned employee */}
       {showRemovalReason && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
           <div className="bg-white dark:bg-stone-900 p-4 rounded shadow max-w-sm w-full">

@@ -171,3 +171,39 @@ export const deleteRosterEmployee = async (roster_employee_id: number): Promise<
     throw error;
   }
 };
+
+/**
+ * Insert a single RosterEmployee record.
+ */
+export const insertSingleRosterEmployee = async (
+  employee: RosterEmployee
+): Promise<RosterEmployee> => {
+  const query = `
+    INSERT INTO public.roster_employees (
+      company_id,
+      roster_id,
+      applicant_id,
+      staff,
+      guard_group,
+      subcontractor
+    )
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING *;
+  `;
+  const values = [
+    employee.company_id,
+    employee.roster_id,
+    employee.applicant_id ?? null,
+    employee.staff ?? null,
+    employee.guard_group ?? null,
+    employee.subcontractor ?? null
+  ];
+
+  try {
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error inserting single roster employee:', error);
+    throw error;
+  }
+};

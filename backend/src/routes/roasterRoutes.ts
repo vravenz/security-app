@@ -12,7 +12,9 @@ import {
   getRosterEmployeeDetails,
   updateRosterShiftAssignment,
   removeRosterShiftAssignmentController,
-  updateRosterShiftDetails
+  updateRosterShiftDetails,
+  createRosterShiftAssignment,
+  createSingleRosterEmployee
 } from '../controllers/roster/rosterController';
 
 const router = express.Router();
@@ -29,7 +31,11 @@ router.put('/rostershiftassignments/:id', updateRosterShiftAssignment);
 router.delete('/rostershiftassignments/:id', removeRosterShiftAssignmentController);
 router.put('/rostershifts/:id', updateRosterShiftDetails);
 
+router.post('/rostershiftassignments', createRosterShiftAssignment);
+
 // New endpoint to get a single roster employee by ID
 router.get('/rosteremployees/:id', getRosterEmployeeDetails);
+
+router.post('/rosteremployees', createSingleRosterEmployee);
 
 export default router;

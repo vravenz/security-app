@@ -69,6 +69,105 @@ export const insertRosterShiftAssignments = async (
   }
 };
 
+/**
+ * Insert a *single* shift assignment record.
+ * (We already have a bulk insert, but let's make one specifically for a single assignment.)
+ */
+export const insertSingleRosterShiftAssignment = async (
+  assignment: RosterShiftAssignment
+): Promise<RosterShiftAssignment> => {
+  const query = `
+    INSERT INTO public.roster_shift_assignments (
+      company_id,
+      roster_shift_id,
+      roster_employee_id,
+      assignment_start_time,
+      assignment_end_time,
+      actual_worked_hours,
+      assignment_status,
+      employee_shift_status
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *;
+  `;
+
+  const values = [
+    assignment.company_id,
+    assignment.roster_shift_id,
+    assignment.roster_employee_id,
+    assignment.assignment_start_time ?? null,
+    assignment.assignment_end_time ?? null,
+    assignment.actual_worked_hours ?? null,
+    assignment.assignment_status ?? 'active',
+    assignment.employee_shift_status ?? 'unconfirmed'
+  ];
+
+  try {
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error inserting single shift assignment:', error);
+    throw error;
+  }
+};
+
+/* ===============================
+   SHIFT ASSIGNMENT HISTORY
+   For logging changes to assignments
+=============================== */
+export interface RosterShiftAssignmentHistory {
+  roster_shift_assignment_history_id?: number;
+  company_id: number;
+  roster_shift_assignment_id: number;
+  assignment_status?: string;
+  actual_worked_hours?: number | null;
+  comments?: string | null;
+  updated_by: number;   // user id
+  change_reason?: string | null;
+  changed_at?: Date;
+}
+
+/**
+ * Insert a record into roster_shift_assignment_history
+ * whenever we create or update an assignment for auditing.
+ */
+export const insertRosterShiftAssignmentHistory = async (
+  data: RosterShiftAssignmentHistory
+): Promise<RosterShiftAssignmentHistory> => {
+  const query = `
+    INSERT INTO public.roster_shift_assignment_history (
+      company_id,
+      roster_shift_assignment_id,
+      assignment_status,
+      actual_worked_hours,
+      comments,
+      updated_by,
+      change_reason
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *;
+  `;
+
+  const values = [
+    data.company_id,
+    data.roster_shift_assignment_id,
+    data.assignment_status || null,
+    data.actual_worked_hours || null,
+    data.comments || null,
+    data.updated_by,
+    data.change_reason || null
+  ];
+
+  try {
+    const { rows } = await pool.query(query, values);
+    return rows[0];
+  } catch (error) {
+    console.error('Error inserting roster shift assignment history:', error);
+    throw error;
+  }
+};
+
+
 /* ===============================
    Fetch Assignments by Shift ID
    =============================== */

@@ -17,7 +17,8 @@ import {
   insertRosterEmployees,
   deleteRosterEmployeesByRosterId,
   getRosterEmployeeById,
-  getRosterEmployeesByRosterId
+  getRosterEmployeesByRosterId,
+  insertSingleRosterEmployee
 } from '../../models/roster/rosterEmployees';
 import {
   RosterShift,
@@ -33,7 +34,9 @@ import {
   deleteAssignmentsByRosterId,
   getAssignmentsByShiftId,
   removeRosterShiftAssignment,
-  getAssignmentsByRosterId
+  getAssignmentsByRosterId,
+  insertSingleRosterShiftAssignment,
+  insertRosterShiftAssignmentHistory
 } from '../../models/roster/rosterShiftAssignments';
 
 import { insertRosterShiftHistory } from '../../models/roster/rosterShiftHistory';
@@ -508,5 +511,123 @@ export const removeRosterShiftAssignmentController = async (req: Request, res: R
   } catch (error) {
     console.error('Error removing roster shift assignment:', error);
     res.status(500).json({ message: 'Server error while removing roster shift assignment' });
+  }
+};
+
+/**
+ * Create a single new shift assignment for an existing shift.
+ * This endpoint is typically called after removing a previous assignment
+ * so you can assign a new employee to the same shift.
+ */
+export const createRosterShiftAssignment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // We expect fields: company_id, roster_shift_id, roster_employee_id, etc.
+    const {
+      company_id,
+      roster_shift_id,
+      roster_employee_id,
+      assignment_start_time,
+      assignment_end_time,
+      actual_worked_hours,
+      assignment_status = 'active',
+      employee_shift_status = 'unconfirmed',
+      comments,
+      change_reason
+    } = req.body;
+
+    // Optionally, you may want to do some validation:
+    if (!company_id || !roster_shift_id || !roster_employee_id) {
+      res.status(400).json({ message: 'Missing required fields. company_id, roster_shift_id, and roster_employee_id are mandatory.' });
+      return;
+    }
+
+    // Insert the assignment
+    const newAssignmentData: RosterShiftAssignment = {
+      company_id,
+      roster_shift_id,
+      roster_employee_id,
+      assignment_start_time: assignment_start_time ?? null,
+      assignment_end_time: assignment_end_time ?? null,
+      actual_worked_hours: actual_worked_hours ?? null,
+      assignment_status,
+      employee_shift_status
+    };
+
+    const newAssignment = await insertSingleRosterShiftAssignment(newAssignmentData);
+
+    // If you want to keep a history log:
+    // We'll assume the user ID is in a header or token (like x-user-id).
+    const updated_by = parseInt(req.headers['x-user-id'] as string, 10) || 0;
+    if (updated_by) {
+      await insertRosterShiftAssignmentHistory({
+        company_id: newAssignment.company_id,
+        roster_shift_assignment_id: newAssignment.roster_shift_assignment_id!,
+        assignment_status: newAssignment.assignment_status,
+        actual_worked_hours: newAssignment.actual_worked_hours,
+        comments: comments ?? null,
+        updated_by,
+        change_reason: change_reason ?? 'New assignment created'
+      });
+    }
+
+    res.status(201).json({
+      message: 'New roster shift assignment created successfully.',
+      assignment: newAssignment
+    });
+  } catch (error) {
+    console.error('Error creating roster shift assignment:', error);
+    res.status(500).json({ message: 'Server error while creating shift assignment.' });
+  }
+};
+
+/**
+ * Create a single RosterEmployee record.
+ * This is needed when the user picks a new applicant who isn't yet in roster_employees.
+ */
+export const createSingleRosterEmployee = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Destructure the required fields from the request body.
+    const {
+      company_id,
+      roster_id,
+      applicant_id,
+      staff = null,
+      guard_group = null,
+      subcontractor = null
+    } = req.body;
+
+    // Basic validation
+    if (!company_id || !roster_id || !applicant_id) {
+      res.status(400).json({
+        message: 'Missing required fields: company_id, roster_id, and applicant_id are required.'
+      });
+      return;
+    }
+
+    // Build the RosterEmployee object.
+    const newRosterEmployeeData: RosterEmployee = {
+      company_id,
+      roster_id,
+      applicant_id,
+      staff,
+      guard_group,
+      subcontractor
+    };
+
+    // Log the input data for debugging.
+    console.log('Creating RosterEmployee with data:', newRosterEmployeeData);
+
+    // Insert the new RosterEmployee into the database.
+    const createdEmployee = await insertSingleRosterEmployee(newRosterEmployeeData);
+
+    // Return success response.
+    res.status(201).json({
+      message: 'New roster employee created successfully.',
+      roster_employee_id: createdEmployee.roster_employee_id,
+      roster_employee: createdEmployee
+    });
+  } catch (error) {
+    console.error('Error creating single roster employee:', error);
+    res.status(500).json({ message: 'Server error while creating single roster employee.' });
   }
 };
