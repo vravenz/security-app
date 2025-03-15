@@ -8,6 +8,7 @@ import {
 import { MdOutlineWorkOutline } from "react-icons/md";
 import ThemeToggle from './ThemeToggle';
 import Card from './Card';
+import Avatar from '../assets/images/avatar.jpg'
 
 interface NavItemProps {
     label: string;
@@ -17,23 +18,22 @@ interface NavItemProps {
 }
 
 const navItems: NavItemProps[] = [
-    { label: 'Dashboard', path: '/super-admin-dashboard', icon: <FaHome /> },
-    { label: 'Recruitment', path: '/recruitment', icon: <MdOutlineWorkOutline /> },
+    { label: 'Dashboard', path: '/super-admin-dashboard' },
+    { label: 'Recruitment', path: '/recruitment' },
     {
         label: 'Workspace', 
         path: '#', 
-        icon: <FaBuilding />,
         subItems: [
             { label: 'Employees', path: '/workspace/employees' },
             { label: 'Subcontractors', path: '/workspace/subcontractors' }
         ]
     },
-    { label: 'Clients', path: '/clients', icon: <FaUsers /> },
-    { label: 'Sites', path: '/sites/add', icon: <FaMapMarkerAlt /> },
-    { label: 'Roasters', path: '/roasters/schedule', icon: <FaCoffee /> },
-    { label: 'Events', path: '/events', icon: <FaCalendar /> },
-    { label: 'Finance', path: '/finance', icon: <FaFileInvoiceDollar /> },
-    { label: 'Reports', path: '/reports', icon: <FaChartPie /> }
+    { label: 'Clients', path: '/clients' },
+    { label: 'Sites', path: '/sites/add' },
+    { label: 'Rosters', path: '/rosters/schedule' },
+    { label: 'Events', path: '/events' },
+    { label: 'Finance', path: '/finance' },
+    { label: 'Reports', path: '/reports' }
 ];
 
 const Navbar: React.FC = () => {
@@ -91,7 +91,7 @@ const Navbar: React.FC = () => {
                     <ThemeToggle />
                     <div className="relative">
                         <button onClick={toggleProfileDropdown} className={`rounded-full w-10 h-10 ${hoverBackgroundClass} flex items-center justify-center`}>
-                            <img src="" alt="Profile" className="rounded-full w-full h-full object-cover" />
+                            <img src={Avatar} alt="Profile" className="rounded-full w-full h-full object-cover" />
                         </button>
                         {isProfileOpen && (
                             <Card className="absolute right-0 w-48 mt-2">

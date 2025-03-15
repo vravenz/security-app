@@ -1,4 +1,4 @@
-import React, { useState, useEffect, FormEvent, useMemo } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -13,15 +13,53 @@ import { useTheme } from '../../../context/ThemeContext';
 
 import { useAuth } from '../../../hooks/useAuth';
 
+// Custom form logic & data hooks
 import { useRoasterFormData } from './formData/useRoasterFormData';
 import { useFetchClients } from './useFetchClients';
 import { useFetchSites } from './useFetchSites';
 import { useExtendedFields } from './useExtendedFields';
 import { useFetchGuardGroups } from './useFetchGuardGroups';
 import { useFetchEmployees } from './useFetchEmployees';
-import EmployeeDropdown from '../../../components/EmployeeDropdown';
-import ShiftsComponent from '../../../components/ShiftsComponent';
 
+// Components for selecting employees and shifts
+import EmployeeDropdown from '../../../components/EmployeeDropdown';
+import ShiftsComponent, { ShiftRecord } from '../../../components/ShiftsComponent';
+
+/** Minimal structure for the top-level “roster” portion */
+interface RosterPayload {
+  company_id: number;
+  site_id: number;
+  po_number?: string;
+}
+
+/** Structure for each row in the “roster_employees” table */
+interface RosterEmployeePayload {
+  applicant_id: number | null;
+  staff?: string;
+  guard_group?: number | null;
+  subcontractor?: number | null;
+}
+
+/** Extended shift structure for “roster_shifts” */
+export interface RosterShiftPayload extends ShiftRecord {
+  shift_status?: 'confirmed' | 'unconfirmed' | 'unassigned';
+  penalty?: number;
+  comments?: string;
+  shift_instruction?: string;
+
+  payable_rate_type?: string;
+  payable_role?: string;
+  payable_amount?: number;
+  billable_role?: string;
+  billable_amount?: number;
+  payable_expenses?: number;
+  billable_expenses?: number;
+
+  unpaid_shift?: boolean;
+  training_shift?: boolean;
+}
+
+/** Basic info about an employee from the DB */
 interface Employee {
   applicant_id: number;
   first_name: string;
@@ -32,338 +70,357 @@ interface Employee {
   subcontractor_company_name?: string;
 }
 
-export interface ShiftRecord {
-  shift_date: string;  // "YYYY-MM-DD"
-  start_time: string;  // "HH:mm"
-  end_time: string;    // "HH:mm"
-  break_time: string;  // e.g., "00:15:00", "00:30:00", etc.
-}
-
-const AddRoasterPage: React.FC = () => {
-  const { companyId } = useAuth();
+const AddRosterPage: React.FC = () => {
+  const { companyId } = useAuth();         // Example: user’s company
   const { theme } = useTheme();
   const navigate = useNavigate();
 
-  const [message, setMessage] = useState<string>('');
+  const [message, setMessage] = useState('');
   const [selectedEmployees, setSelectedEmployees] = useState<Employee[]>([]);
 
-  // 1) Base roaster form data (from custom hook)
+  // Our main form data
   const { formData, setFormData } = useRoasterFormData();
 
-  // 2) Custom hooks for fetching clients and sites
+  // Data fetching hooks
   const { clients, fetchClients } = useFetchClients();
   const { sites, fetchSites, selectedSiteDetails, handleSelectSite } = useFetchSites();
-
   const { guardGroups, fetchGuardGroups } = useFetchGuardGroups(companyId);
+  const { employees, fetchEmployees } = useFetchEmployees(companyId, Number(formData.guard_group) || 0);
 
-  const guardGroupId = Number(formData.guard_group) || 0;
-  const { employees, fetchEmployees } = useFetchEmployees(companyId, guardGroupId);
+  // Local state for the SHIFT data
+  const [shifts, setShifts] = useState<RosterShiftPayload[]>([]);
 
-  const [shifts, setShifts] = useState<ShiftRecord[]>([]);
-
+  /** 1) On mount: fetch clients, guard groups, set formData.company_id. */
   useEffect(() => {
-    if (companyId) {
-      fetchGuardGroups();
-    }
-  }, [companyId, fetchGuardGroups]);
-  
-  useEffect(() => {
-    if (companyId && guardGroupId) {
-      fetchEmployees();
-    }
-  }, [companyId, guardGroupId, fetchEmployees]); 
-
-  useEffect(() => {
-    // Clear selected employees when staff type or guard group changes
-    setSelectedEmployees([]);
-  }, [formData.select_staff, formData.guard_group]);
-  
-
-  // 3) Extended fields (base fields + your additional fields/logic)
-  const extendedFields = useExtendedFields({
-    formData,
-    setFormData,
-    sites,
-    selectedSiteDetails,
-    clients,
-    handleSelectSite,
-  });
-
-  // --- Side-effects to fetch data ---
-  useEffect(() => {
-    // fetch clients on mount if we have a companyId
     if (companyId) {
       setFormData((prev) => ({ ...prev, company_id: companyId }));
       fetchClients(companyId);
+      fetchGuardGroups();
     }
-  }, [companyId, fetchClients, setFormData]);
+  }, [companyId, fetchClients, fetchGuardGroups, setFormData]);
 
-  // When client_id changes, fetch sites for that client
+  /** 2) When client_id changes, fetch that client’s sites */
   useEffect(() => {
     if (formData.client_id) {
       fetchSites(formData.client_id);
     }
   }, [formData.client_id, fetchSites]);
 
-  // 4) Handle form submission
+  /** 3) When guard_group changes, fetch employees in that group */
+  useEffect(() => {
+    if (companyId && formData.guard_group) {
+      fetchEmployees();
+    }
+  }, [companyId, formData.guard_group, fetchEmployees]);
+
+  /** 4) If staff type or guard group changes, reset our selected employees. */
+  useEffect(() => {
+    setSelectedEmployees([]);
+  }, [formData.select_staff, formData.guard_group]);
+
+  /** Use our “extended fields” hook to define which input fields to render */
+  const extendedFields = useExtendedFields({
+    formData,
+    setFormData,
+    clients,
+    sites,
+    selectedSiteDetails,
+    handleSelectSite,
+  });
+
+  // For layout convenience, group some fields
+  const card2Names = ['payable_rate_type', 'payable_role', 'payable_amount', 'payable_expenses', 'unpaid_shift'];
+  const card3Names = ['billable_role', 'billable_amount', 'billable_expenses', 'training_shift'];
+  const card4Names = ['penalty', 'comments', 'shift_instruction'];
+  const allCard2_3_4 = [...card2Names, ...card3Names, ...card4Names];
+
+  const card1Fields = extendedFields.filter((field) => !allCard2_3_4.includes(field.name));
+  const card2Fields = extendedFields.filter((field) => card2Names.includes(field.name));
+  const card3Fields = extendedFields.filter((field) => card3Names.includes(field.name));
+  const card4Fields = extendedFields.filter((field) => card4Names.includes(field.name));
+
+  /**
+   * Final form submission that calls:
+   *    POST /api/rosters
+   * with a payload containing:
+   *    - top-level “roster” data
+   *    - selectedEmployees[] → roster_employees
+   *    - selectedShifts[] → roster_shifts
+   */
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    setMessage('');
+
+    // Basic validations
     if (!formData.company_id) {
-      setMessage('Company ID is not set. Please re-login or contact support.');
+      setMessage('Company ID is missing; please re-check your login or config.');
+      return;
+    }
+    if (!formData.site_id) {
+      setMessage('Please select a site before submitting.');
       return;
     }
 
     try {
-      let selectedEmployeesPayload;
+      // 1) Build the top-level roster object
+      const rosterPayload: RosterPayload = {
+        company_id: formData.company_id,
+        site_id: formData.site_id,
+        po_number: formData.po_number || undefined,
+      };
 
+      // 2) Build the “roster_employees” array
+      let selectedEmployeesPayload: RosterEmployeePayload[];
       if (formData.select_staff === 'unassigned') {
-        // For unassigned case, set applicant_id, guard_group, and subcontractor to null
-        selectedEmployeesPayload = [{
-          applicant_id: null,
-          staff: 'unassigned',
-          guard_group: null,
-          subcontractor: null,
-        }];
+        // If user wants “unassigned,” we create just one row with applicant_id=null
+        selectedEmployeesPayload = [
+          {
+            applicant_id: null,
+            staff: 'unassigned',
+            guard_group: null,
+            subcontractor: null,
+          },
+        ];
       } else {
-        // For non-unassigned employees
-        selectedEmployeesPayload = selectedEmployees.map(emp => ({
+        // Otherwise, transform each selected employee into a roster_employees object
+        selectedEmployeesPayload = selectedEmployees.map((emp) => ({
           applicant_id: emp.applicant_id,
           staff: formData.select_staff,
           guard_group: formData.guard_group ? Number(formData.guard_group) : null,
-          subcontractor: emp.is_subcontractor_employee 
-            ? emp.subcontractor_company_id ?? null 
-            : null,
+          subcontractor: emp.is_subcontractor_employee ? emp.subcontractor_company_id ?? null : null,
         }));
       }
 
-      // Build the complete payload
+      // 3) Build the “roster_shifts” array
+      // Merge in top-level fields like penalty, comments, instructions, etc.
+      const selectedShiftsPayload: RosterShiftPayload[] = shifts.map((shift) => ({
+        ...shift,
+        penalty: formData.penalty,
+        comments: formData.comments,
+        shift_instruction: formData.shift_instruction,
+        shift_status: formData.shift_status as 'confirmed' | 'unconfirmed' | 'unassigned',
+
+        payable_rate_type: formData.payable_rate_type,
+        payable_role: formData.payable_role,
+        payable_amount: formData.payable_amount,
+        payable_expenses: formData.payable_expenses,
+
+        billable_role: formData.billable_role,
+        billable_amount: formData.billable_amount,
+        billable_expenses: formData.billable_expenses,
+
+        unpaid_shift: formData.unpaid_shift,
+        training_shift: formData.training_shift,
+      }));
+
+      // 4) Combine everything into the final payload matching your backend’s `createRoster` endpoint
       const payload = {
-        ...formData, // Include all roaster fields
-        selectedEmployees: selectedEmployeesPayload,
-        selectedShifts: shifts,
+        ...rosterPayload,
+        employees: selectedEmployeesPayload,
+        shifts: selectedShiftsPayload,
       };
 
-      const response = await axios.post('http://localhost:4000/api/roasters', payload);
+      // 5) POST to your server
+      const response = await axios.post('http://localhost:4000/api/rosters', payload);
       if (response.status === 201) {
-        setMessage('Roaster added successfully!');
-        navigate('/roasters/schedule');
+        setMessage('Roster created successfully!');
+        // Example: redirect to some “Roster Schedule” or list page
+        navigate('/rosters/schedule');
       }
     } catch (error) {
-      console.error('Failed to add roaster:', error);
-      setMessage('Failed to add roaster. Please check the input data.');
+      console.error('Failed to create roster:', error);
+      setMessage('Failed to create roster. Please check your data and try again.');
     }
   };
-
-  // 1) The field names for each card (desired order)
-  const card2Names = ['payable_rate_type', 'payable_role', 'payable_amount', 'payable_expenses', 'unpaid_shift'];
-  const card3Names = ['billable_role', 'billable_amount', 'billable_expenses', 'training_shift'];
-  const card4Names = ['penalty', 'comments', 'shift_instruction'];
-
-  // 2) Combine the above so we can exclude them from card1
-  const allCard2_3_4 = [...card2Names, ...card3Names, ...card4Names];
-
-  // 3) Filter out and sort the fields for each card according to the defined order
-  const card1Fields = extendedFields.filter((field) => !allCard2_3_4.includes(field.name));
-
-  const card2Fields = extendedFields
-    .filter((field) => card2Names.includes(field.name))
-    .sort((a, b) => card2Names.indexOf(a.name) - card2Names.indexOf(b.name));
-
-  const card3Fields = extendedFields
-    .filter((field) => card3Names.includes(field.name))
-    .sort((a, b) => card3Names.indexOf(a.name) - card3Names.indexOf(b.name));
-
-  const card4Fields = extendedFields
-    .filter((field) => card4Names.includes(field.name))
-    .sort((a, b) => card4Names.indexOf(a.name) - card4Names.indexOf(b.name));
-
 
   return (
     <div className={`flex flex-col min-h-screen ${theme === 'dark' ? 'bg-dark-background' : 'bg-light-background'}`}>
       <Navbar />
-      <div className='flex-grow'>
-      <TwoColumnLayout
-        sidebarContent={<SideNavbar />}
-        mainContent={
-          <div className={`${theme === 'dark' ? 'text-dark-text' : 'text-light-text'}`}>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* 2-column grid: left is card1, right has cards 2,3,4 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {/* ----- Card 1: Everything except the fields in card2/3/4 ----- */}
-                <Card className="md:col-span-2 p-6 space-y-4">
-                  <h1 className="text-xl font-bold mb-4">Add New Roaster</h1>
-                  {card1Fields.map((field) => (
-                    <InputField
-                      key={field.name}
-                      type={field.type}
-                      name={field.name}
-                      value={(formData as any)[field.name]}
-                      onChange={field.onChange}
-                      label={field.label}
-                      required={field.required}
-                      options={field.options}
-                    />
-                  ))}
 
-                {/* Conditionally render additional dropdowns based on selections */}
-                {formData.select_staff === 'Employee' && (
-                  <>
-                    <InputField
-                      type="select"
-                      name="guard_group"
-                      label="Select Guard Group"
-                      required
-                      options={guardGroups.map((g) => ({ label: g.group_name, value: g.group_id }))}
-                      value={formData.guard_group}
-                      onChange={(e) => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          guard_group: e.target.value,
-                          employee: '',
-                        }));
-                        // Clear selected employees on guard group change
-                        setSelectedEmployees([]);
-                      }}
-                    />
-                    {formData.guard_group && (
+      <div className="flex-grow">
+        <TwoColumnLayout
+          sidebarContent={<SideNavbar />}
+          mainContent={
+            <div className={`${theme === 'dark' ? 'text-dark-text' : 'text-light-text'}`}>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  {/* LEFT + CENTER: Roster-level fields & Shift patterns */}
+                  <Card className="md:col-span-2 p-6 space-y-4">
+                    <h1 className="text-xl font-bold mb-4">Add New Roster</h1>
+
+                    {/* Card 1 fields */}
+                    {card1Fields.map((field) => (
+                      <InputField
+                        key={field.name}
+                        type={field.type}
+                        name={field.name}
+                        value={(formData as any)[field.name] || ''}
+                        onChange={field.onChange}
+                        label={field.label}
+                        required={field.required}
+                        options={field.options}
+                      />
+                    ))}
+
+                    {/* If "Employee" is selected, show guard group + employee selection */}
+                    {formData.select_staff === 'Employee' && (
                       <>
-                        <EmployeeDropdown
-                          label="Select Employee"
-                          employees={employees}
-                          value={formData.employee ? Number(formData.employee) : undefined}
-                          onChange={(selectedId) => {
-                            // Find the selected employee in the current employees list
-                            const emp = employees.find(e => e.applicant_id === selectedId);
-                            if (emp) {
-                              setSelectedEmployees(prev => {
-                                // Add only if not already selected
-                                if (!prev.some(e => e.applicant_id === emp.applicant_id)) {
-                                  return [...prev, emp];
-                                }
-                                return prev;
-                              });
-                            }
+                        <InputField
+                          type="select"
+                          name="guard_group"
+                          label="Select Guard Group"
+                          required
+                          options={guardGroups.map((g) => ({
+                            label: g.group_name,
+                            value: g.group_id,
+                          }))}
+                          value={formData.guard_group || ''}
+                          onChange={(e) => {
                             setFormData((prev) => ({
                               ...prev,
-                              employee: String(selectedId),
+                              guard_group: e.target.value,
+                              employee: '',
                             }));
+                            setSelectedEmployees([]);
                           }}
                         />
-                      {/* Container for selected employees */}
-                      <div className="mt-4 p-4 border-2 dark:border-zinc-700 border-dotted rounded">
-                        {selectedEmployees.length === 0 ? (
-                          <p className="text-gray-500">No employees are selected</p>
-                        ) : (
-                          <div className="flex flex-wrap gap-4">
-                            {selectedEmployees.map(emp => (
-                              <div 
-                                key={emp.applicant_id} 
-                                className="flex flex-col items-center p-2 rounded shadow-sm bg-stone-100 dark:bg-stone-950 text-center"
-                              >
-                                {emp.employee_photo ? (
-                                  <img 
-                                    src={`http://localhost:4000/uploads/employee-photos/${emp.employee_photo}`} 
-                                    alt={`${emp.first_name} ${emp.last_name}`}
-                                    className="h-14 w-14 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="h-14 w-14 rounded-full bg-gray-300 flex items-center justify-center">
-                                    N/A
-                                  </div>
-                                )}
-                                <span className="text-sm font-medium mt-1">
-                                  {emp.first_name} {emp.last_name}
-                                </span>
-                                {emp.is_subcontractor_employee && (
-                                  <span className="text-xs font-semibold mt-1 text-gray-600 bg-yellow-200 rounded-full px-2 py-1">
-                                    Sub-Employee{emp.subcontractor_company_name ? ` - ${emp.subcontractor_company_name}` : ''}
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
+
+                        {formData.guard_group && (
+                          <>
+                            <EmployeeDropdown
+                              label="Select Employee"
+                              employees={employees}
+                              value={formData.employee ? Number(formData.employee) : undefined}
+                              onChange={(selectedId) => {
+                                const emp = employees.find((e) => e.applicant_id === selectedId);
+                                if (emp) {
+                                  setSelectedEmployees((prev) => {
+                                    const alreadySelected = prev.some((x) => x.applicant_id === emp.applicant_id);
+                                    return alreadySelected ? prev : [...prev, emp];
+                                  });
+                                }
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  employee: String(selectedId),
+                                }));
+                              }}
+                            />
+                            <div className="mt-4 p-4 border-2 border-dotted rounded dark:border-zinc-700">
+                              {selectedEmployees.length === 0 ? (
+                                <p className="text-gray-500">No employees selected</p>
+                              ) : (
+                                <div className="flex flex-wrap gap-4">
+                                  {selectedEmployees.map((emp) => (
+                                    <div
+                                      key={emp.applicant_id}
+                                      className="flex flex-col items-center p-2 rounded shadow-sm bg-stone-100 dark:bg-stone-950 text-center"
+                                    >
+                                      {emp.employee_photo ? (
+                                        <img
+                                          src={`http://localhost:4000/uploads/employee-photos/${emp.employee_photo}`}
+                                          alt={`${emp.first_name} ${emp.last_name}`}
+                                          className="h-14 w-14 rounded-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="h-14 w-14 rounded-full bg-gray-300 flex items-center justify-center">
+                                          N/A
+                                        </div>
+                                      )}
+                                      <span className="text-sm font-medium mt-1">
+                                        {emp.first_name} {emp.last_name}
+                                      </span>
+                                      {emp.is_subcontractor_employee && (
+                                        <span className="text-xs font-semibold mt-1 text-gray-600 bg-yellow-200 rounded-full px-2 py-1">
+                                          Sub-Employee
+                                          {emp.subcontractor_company_name
+                                            ? ` - ${emp.subcontractor_company_name}`
+                                            : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </>
                         )}
-                      </div>
                       </>
                     )}
-                  </>
-                )}
 
-                  <ShiftsComponent onShiftsChange={setShifts} />
-                </Card>
-
-                {/* ----- Right Column: 3 stacked cards ----- */}
-                <div className="flex flex-col space-y-2">
-
-                  {/* Card 2: Payable */}
-                  <Card className="p-6 space-y-4">
-                    <h2 className="text-lg font-bold mb-2 text-blue-600">Payable</h2>
-                    {card2Fields.map((field) => (
-                      <InputField
-                        key={field.name}
-                        type={field.type}
-                        name={field.name}
-                        value={(formData as any)[field.name]}
-                        onChange={field.onChange}
-                        label={field.label}
-                        required={field.required}
-                        options={field.options}
-                      />
-                    ))}
+                    {/* The Shifts component: “Same multiple shifts” or “Different multiple shifts” */}
+                    <ShiftsComponent onShiftsChange={(newShifts) => setShifts(newShifts)} />
                   </Card>
 
-                  {/* Card 3: Billable */}
-                  <Card className="p-6 space-y-4">
-                    <h2 className="text-lg font-bold mb-2 text-green-600">Billable</h2>
-                    {card3Fields.map((field) => (
-                      <InputField
-                        key={field.name}
-                        type={field.type}
-                        name={field.name}
-                        value={(formData as any)[field.name]}
-                        onChange={field.onChange}
-                        label={field.label}
-                        required={field.required}
-                        options={field.options}
-                      />
-                    ))}
-                  </Card>
+                  {/* RIGHT column: Additional pay/bill info, penalty, comments, etc. */}
+                  <div className="flex flex-col space-y-2">
+                    <Card className="p-6 space-y-4">
+                      <h2 className="text-lg font-bold mb-2 text-blue-600">Payable</h2>
+                      {card2Fields.map((field) => (
+                        <InputField
+                          key={field.name}
+                          type={field.type}
+                          name={field.name}
+                          value={(formData as any)[field.name] || ''}
+                          onChange={field.onChange}
+                          label={field.label}
+                          required={field.required}
+                          options={field.options}
+                        />
+                      ))}
+                    </Card>
 
-                  {/* Card 4: Penalty, Comments, Shift Instruction */}
-                  <Card className="p-6 space-y-4">
-                    <h2 className="text-lg font-bold mb-2 text-red-600">Additional</h2>
-                    {card4Fields.map((field) => (
-                      <InputField
-                        key={field.name}
-                        type={field.type}
-                        name={field.name}
-                        value={(formData as any)[field.name]}
-                        onChange={field.onChange}
-                        label={field.label}
-                        required={field.required}
-                        options={field.options}
-                      />
-                    ))}
-                  </Card>
+                    <Card className="p-6 space-y-4">
+                      <h2 className="text-lg font-bold mb-2 text-green-600">Billable</h2>
+                      {card3Fields.map((field) => (
+                        <InputField
+                          key={field.name}
+                          type={field.type}
+                          name={field.name}
+                          value={(formData as any)[field.name] || ''}
+                          onChange={field.onChange}
+                          label={field.label}
+                          required={field.required}
+                          options={field.options}
+                        />
+                      ))}
+                    </Card>
+
+                    <Card className="p-6 space-y-4">
+                      <h2 className="text-lg font-bold mb-2 text-red-600">Additional</h2>
+                      {card4Fields.map((field) => (
+                        <InputField
+                          key={field.name}
+                          type={field.type}
+                          name={field.name}
+                          value={(formData as any)[field.name] || ''}
+                          onChange={field.onChange}
+                          label={field.label}
+                          required={field.required}
+                          options={field.options}
+                        />
+                      ))}
+                    </Card>
+                  </div>
                 </div>
-              </div>
 
-              {/* Submit button below all cards */}
-              <div className="flex justify-end">
-                <Button type="submit" color="submit" icon="plus" marginRight='5px' size="small">
-                  Add Roaster
-                </Button>
-              </div>
-            </form>
+                {/* Submit button */}
+                <div className="flex justify-end">
+                  <Button type="submit" color="submit" icon="plus" marginRight="5px" size="small">
+                    Add Roster
+                  </Button>
+                </div>
+              </form>
 
-            {message && <p className="text-red-500 mt-2">{message}</p>}
-          </div>
-        }
-      />
+              {/* Display any error/success messages */}
+              {message && <p className="text-red-500 mt-2">{message}</p>}
+            </div>
+          }
+        />
       </div>
+
       <Footer />
     </div>
   );
 };
 
-export default AddRoasterPage;
+export default AddRosterPage;

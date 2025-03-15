@@ -53,10 +53,10 @@ const sideNavItems: SideNavItemType = {
         { label: 'Site List', path: '/sites', icon: <FaMapMarkedAlt /> },
         { label: 'Add Site', path: '/sites/add', icon: <FaMapMarkedAlt /> }
     ],    
-    '/roasters': [
-        { label: 'Add Roster', path: '/roasters/add', icon: <FaCalendarAlt /> },
-        { label: 'Guards Roster', path: '/roasters/guards', icon: <FaCalendarAlt /> },
-        { label: 'Client Roster', path: '/roasters/schedule', icon: <FaCalendarAlt /> },
+    '/rosters': [
+        { label: 'Add Roster', path: '/rosters/add', icon: <FaCalendarAlt /> },
+        { label: 'Guards Roster', path: '/rosters/guards', icon: <FaCalendarAlt /> },
+        { label: 'Client Roster', path: '/rosters/schedule', icon: <FaCalendarAlt /> },
     ],
     '/events': [
         { label: 'Event Calendar', path: '/events/calendar', icon: <FaCalendarAlt /> },

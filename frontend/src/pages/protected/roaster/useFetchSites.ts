@@ -1,3 +1,4 @@
+// File: src/pages/AddRosterPage/hooks/useFetchSites.ts
 import { useState, useCallback } from 'react';
 import axios from 'axios';
 
@@ -14,9 +15,10 @@ export const useFetchSites = () => {
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteDetails, setSelectedSiteDetails] = useState<Site | null>(null);
 
-  // fetch sites by client_id
+  // 1) Fetch a list of sites for a given client
   const fetchSites = useCallback(async (clientId: number) => {
     try {
+      // Example endpoint: GET /api/clients/:clientId/sites
       const { data } = await axios.get<Site[]>(`http://localhost:4000/api/clients/${clientId}/sites`);
       setSites(data);
     } catch (error) {
@@ -25,13 +27,14 @@ export const useFetchSites = () => {
     }
   }, []);
 
-  // fetch single site details by siteId
+  // 2) Fetch one site detail
   const handleSelectSite = useCallback(async (siteId: number) => {
     if (!siteId) {
       setSelectedSiteDetails(null);
       return;
     }
     try {
+      // GET /api/sites/:siteId
       const { data } = await axios.get<Site>(`http://localhost:4000/api/sites/${siteId}`);
       setSelectedSiteDetails(data);
     } catch (error) {

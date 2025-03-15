@@ -1,3 +1,4 @@
+// File: src/pages/AddRosterPage/hooks/useFetchEmployees.ts
 import { useState, useCallback } from 'react';
 import axios from 'axios';
 
@@ -15,15 +16,15 @@ export const useFetchEmployees = (companyId: number | null, groupId: number) => 
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   const fetchEmployees = useCallback(async () => {
-    if (!companyId || !groupId) return;  // Ensure valid companyId and groupId
+    if (!companyId || !groupId) return;
     try {
-      // Fetch only the guards that are part of the specified group
-      const groupGuardsResponse = await axios.get(`http://localhost:4000/api/guard-groups/${groupId}/guards`);
-      
-      // Assume the response data is an array of employees in the group
-      setEmployees(groupGuardsResponse.data);
+      // Example: GET /api/guard-groups/:groupId/guards
+      const { data } = await axios.get<Employee[]>(
+        `http://localhost:4000/api/guard-groups/${groupId}/guards`
+      );
+      setEmployees(data);
     } catch (error) {
-      console.error('Failed to fetch employees in group:', error);
+      console.error('Failed to fetch employees:', error);
       setEmployees([]);
     }
   }, [companyId, groupId]);

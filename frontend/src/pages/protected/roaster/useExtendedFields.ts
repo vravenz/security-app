@@ -1,4 +1,6 @@
-import { useMemo, ChangeEvent, useState } from 'react';
+// File: src/pages/AddRosterPage/hooks/useExtendedFields.ts
+
+import { useMemo, useState } from 'react';
 import { RoasterFormData } from './formData/useRoasterFormData';
 
 export interface FieldConfig {
@@ -24,11 +26,11 @@ export interface FieldConfig {
   ) => void;
 }
 
+// Example data models for your Clients & Sites
 interface Client {
   client_id: number;
   client_name: string;
 }
-
 interface Site {
   site_id: number;
   site_name: string;
@@ -45,7 +47,7 @@ interface ExtendedFieldsProps {
   sites: Site[];
   selectedSiteDetails: Site | null;
   handleSelectSite: (siteId: number) => void;
-  isEditMode?: boolean; // New flag: true for edit page
+  isEditMode?: boolean; // optional if you want to skip certain fields when editing
 }
 
 export const useExtendedFields = ({
@@ -61,7 +63,10 @@ export const useExtendedFields = ({
   const [previousBillableAmount, setPreviousBillableAmount] = useState<number>(0);
   const [poReceived, setPoReceived] = useState<boolean>(false);
 
-  // ---------- Base Fields ----------
+  /**
+   * The “base” fields for client, site, duty_type, etc.
+   * We skip “client_id” / “site_id” in edit mode if you prefer to lock them.
+   */
   const baseFields = useMemo<FieldConfig[]>(() => {
     const fields: FieldConfig[] = [
       {
@@ -102,7 +107,6 @@ export const useExtendedFields = ({
             site_id: val,
             site_name: selectedSite ? selectedSite.site_name : '',
           }));
-          // Also fetch site details
           handleSelectSite(val);
         },
       },
@@ -123,7 +127,7 @@ export const useExtendedFields = ({
         required: true,
         options: [
           { label: 'Employee', value: 'Employee' },
-          { label: 'unassigned', value: 'unassigned' },
+          { label: 'Unassigned', value: 'unassigned' },
         ],
         onChange: (e) => {
           setFormData((prev) => ({
@@ -173,16 +177,16 @@ export const useExtendedFields = ({
       },
     ];
 
-    // In edit mode, we do not need the client and site selection fields.
+    // If we’re in edit mode, you might skip client/site changes:
     if (isEditMode) {
-      return fields.filter(
-        (field) => field.name !== 'client_id' && field.name !== 'site_id'
-      );
+      return fields.filter((f) => f.name !== 'client_id' && f.name !== 'site_id');
     }
     return fields;
-  }, [clients, sites, setFormData, handleSelectSite, isEditMode]);
+  }, [clients, sites, handleSelectSite, setFormData, isEditMode]);
 
-  // ---------- Extended Fields for Payable/Billable, etc. ----------
+  /**
+   * Additional fields for pay/bill amounts, checkboxes, penalty, etc.
+   */
   const extendedFields = useMemo<FieldConfig[]>(() => {
     return [
       {
@@ -315,13 +319,8 @@ export const useExtendedFields = ({
         onChange: (e) => {
           if (e.target instanceof HTMLInputElement) {
             const selectedStatus = e.target.value as 'confirmed' | 'unconfirmed';
-            if (selectedStatus === 'unconfirmed') {
-              setPreviousPayableAmount(formData.payable_amount);
-              setPreviousBillableAmount(formData.billable_amount);
-              setFormData((prev) => ({ ...prev, shift_status: 'unconfirmed' }));
-            } else {
-              setFormData((prev) => ({ ...prev, shift_status: 'confirmed' }));
-            }
+            // If “unconfirmed,” maybe set pay/bill to zero? Or do nothing.
+            setFormData((prev) => ({ ...prev, shift_status: selectedStatus }));
           }
         },
       },
@@ -342,6 +341,7 @@ export const useExtendedFields = ({
           }
         },
       },
+      // Conditionally add a PO Number field if user says “po_received=true”
       ...(poReceived
         ? [
             {
@@ -398,7 +398,7 @@ export const useExtendedFields = ({
     poReceived,
   ]);
 
-  // Merge base + extended fields
+  // Merge “base” fields + “extended” fields
   return useMemo(() => {
     return [...baseFields, ...extendedFields];
   }, [baseFields, extendedFields]);

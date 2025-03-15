@@ -1,3 +1,4 @@
+// File: src/pages/AddRosterPage/hooks/useFetchClients.ts
 import { useCallback, useState } from 'react';
 import axios from 'axios';
 
@@ -11,6 +12,7 @@ export const useFetchClients = () => {
 
   const fetchClients = useCallback(async (companyId: number) => {
     try {
+      // Example endpoint: GET /api/clients/company/:companyId
       const { data } = await axios.get<Client[]>(
         `http://localhost:4000/api/clients/company/${companyId}`
       );

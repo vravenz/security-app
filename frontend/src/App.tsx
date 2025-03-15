@@ -103,10 +103,10 @@ const App = () => {
               <Route path="/sites" element={<SitesPage />} />
               <Route path="/sites/:siteId" element={<SiteDetailPage />} />
               {/* ===== Roaster ===== */}
-              <Route path="/roasters/add" element={<AddRoasterPage />} />
-              <Route path="/roasters/schedule" element={<ScheduleRoasterPage />} />
-              <Route path="/roasters/guards" element={<GuardRoasterPage />} />
-              <Route path="/roasters/edit/:id" element={<EditRoasterPage />} />
+              <Route path="/rosters/add" element={<AddRoasterPage />} />
+              <Route path="/rosters/schedule" element={<ScheduleRoasterPage />} />
+              <Route path="/rosters/guards" element={<GuardRoasterPage />} />
+              <Route path="/rosters/edit/:id" element={<EditRoasterPage />} />
               {/* ===== Privacy Policy ===== */}
               <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
               <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />

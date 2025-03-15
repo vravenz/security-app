@@ -1,0 +1,266 @@
+import pool from '../../config/database';
+
+/* ===============================
+   Roster Shift Assignment Interface
+   =============================== */
+export interface RosterShiftAssignment {
+  roster_shift_assignment_id?: number;
+  company_id: number;
+  roster_shift_id: number;
+  roster_employee_id: number;
+  assignment_start_time?: string | null; // e.g. "HH:mm:ss"
+  assignment_end_time?: string | null;   // e.g. "HH:mm:ss"
+  actual_worked_hours?: number | null;
+  assignment_status?: 'active' | 'removed' | 'completed';
+  employee_shift_status?: 'confirmed' | 'unconfirmed';
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+/* ===============================
+   Bulk Insert Assignments
+   =============================== */
+export const insertRosterShiftAssignments = async (
+  assignments: RosterShiftAssignment[]
+): Promise<RosterShiftAssignment[]> => {
+  if (!assignments || assignments.length === 0) return [];
+
+  const insertQuery = `
+    INSERT INTO public.roster_shift_assignments (
+      company_id,
+      roster_shift_id,
+      roster_employee_id,
+      assignment_start_time,
+      assignment_end_time,
+      actual_worked_hours,
+      assignment_status,
+      employee_shift_status
+    )
+    VALUES
+  `;
+  const valuesClause: string[] = [];
+  const params: any[] = [];
+  let i = 1;
+
+  for (const a of assignments) {
+    valuesClause.push(`(
+      $${i++}, $${i++}, $${i++}, $${i++}, $${i++},
+      $${i++}, $${i++}, $${i++}
+    )`);
+    params.push(
+      a.company_id,
+      a.roster_shift_id,
+      a.roster_employee_id,
+      a.assignment_start_time ?? null,
+      a.assignment_end_time ?? null,
+      a.actual_worked_hours ?? null,
+      a.assignment_status ?? 'active',
+      a.employee_shift_status ?? 'unconfirmed'
+    );
+  }
+
+  const finalQuery = insertQuery + valuesClause.join(', ') + ' RETURNING *;';
+  try {
+    const { rows } = await pool.query(finalQuery, params);
+    return rows;
+  } catch (error) {
+    console.error('Error inserting shift assignments:', error);
+    throw error;
+  }
+};
+
+/* ===============================
+   Fetch Assignments by Shift ID
+   =============================== */
+export const getAssignmentsByShiftId = async (
+  roster_shift_id: number
+): Promise<RosterShiftAssignment[]> => {
+  const query = `
+    SELECT *
+    FROM public.roster_shift_assignments
+    WHERE roster_shift_id = $1
+    ORDER BY roster_shift_assignment_id;
+  `;
+  try {
+    const { rows } = await pool.query(query, [roster_shift_id]);
+    return rows;
+  } catch (error) {
+    console.error('Error fetching shift assignments by shift_id:', error);
+    throw error;
+  }
+};
+
+/* ===============================
+   Fetch Assignments by Roster ID (via join)
+   =============================== */
+export const getAssignmentsByRosterId = async (
+  roster_id: number
+): Promise<RosterShiftAssignment[]> => {
+  const query = `
+    SELECT rsa.*
+    FROM public.roster_shift_assignments AS rsa
+    JOIN public.roster_shifts AS rs ON rs.roster_shift_id = rsa.roster_shift_id
+    WHERE rs.roster_id = $1
+    ORDER BY rsa.roster_shift_assignment_id;
+  `;
+  try {
+    const { rows } = await pool.query(query, [roster_id]);
+    return rows;
+  } catch (error) {
+    console.error('Error fetching shift assignments by roster_id:', error);
+    throw error;
+  }
+};
+
+/* ===============================
+   Update an Assignment
+   =============================== */
+export const updateRosterShiftAssignment = async (
+  roster_shift_assignment_id: number,
+  data: Partial<RosterShiftAssignment>
+): Promise<RosterShiftAssignment> => {
+  const {
+    assignment_start_time,
+    assignment_end_time,
+    actual_worked_hours,
+    assignment_status,
+    employee_shift_status,
+  } = data;
+
+  const query = `
+    UPDATE public.roster_shift_assignments
+    SET
+      assignment_start_time   = COALESCE($1, assignment_start_time),
+      assignment_end_time     = COALESCE($2, assignment_end_time),
+      actual_worked_hours     = COALESCE($3, actual_worked_hours),
+      assignment_status       = COALESCE($4, assignment_status),
+      employee_shift_status   = COALESCE($5, employee_shift_status),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE roster_shift_assignment_id = $6
+    RETURNING *;
+  `;
+  const values = [
+    assignment_start_time ?? null,
+    assignment_end_time ?? null,
+    actual_worked_hours ?? null,
+    assignment_status ?? null,
+    employee_shift_status ?? null,
+    roster_shift_assignment_id,
+  ];
+
+  try {
+    const { rows } = await pool.query(query, values);
+    if (!rows.length) {
+      throw new Error(`No roster_shift_assignment found with ID ${roster_shift_assignment_id}`);
+    }
+    return rows[0];
+  } catch (error) {
+    console.error('Error updating roster_shift_assignment:', error);
+    throw error;
+  }
+};
+
+/* ===============================
+   Delete All Assignments by Roster ID
+   =============================== */
+export const deleteAssignmentsByRosterId = async (roster_id: number): Promise<void> => {
+  const query = `
+    DELETE FROM public.roster_shift_assignments AS rsa
+    USING public.roster_shifts AS rs
+    WHERE rs.roster_shift_id = rsa.roster_shift_id
+    AND rs.roster_id = $1
+  `;
+  try {
+    await pool.query(query, [roster_id]);
+  } catch (error) {
+    console.error('Error deleting shift assignments by roster_id:', error);
+    throw error;
+  }
+};
+
+/* ===============================
+   Delete a Single Assignment by ID
+   (This may be used when you really want to delete the row.)
+   =============================== */
+export const deleteRosterShiftAssignment = async (
+  roster_shift_assignment_id: number
+): Promise<void> => {
+  const query = `DELETE FROM public.roster_shift_assignments WHERE roster_shift_assignment_id = $1`;
+  try {
+    await pool.query(query, [roster_shift_assignment_id]);
+  } catch (error) {
+    console.error('Error deleting roster_shift_assignment:', error);
+    throw error;
+  }
+};
+
+/* ===============================
+   Roster Shift Assignment Removal Interface
+   (This is for logging removals)
+   =============================== */
+export interface RosterShiftAssignmentRemoval {
+  removal_id?: number;
+  company_id: number;
+  roster_shift_assignment_id: number;
+  removed_by: number;
+  removal_reason?: string;
+  removed_at?: Date;
+}
+
+/* ===============================
+   Insert a Removal Record
+   =============================== */
+export const insertRosterShiftAssignmentRemoval = async (
+  data: RosterShiftAssignmentRemoval
+): Promise<RosterShiftAssignmentRemoval> => {
+  const query = `
+    INSERT INTO public.roster_shift_assignment_removals (
+      company_id,
+      roster_shift_assignment_id,
+      removed_by,
+      removal_reason
+    )
+    VALUES ($1, $2, $3, $4)
+    RETURNING *;
+  `;
+  const values = [
+    data.company_id,
+    data.roster_shift_assignment_id,
+    data.removed_by,
+    data.removal_reason || null,
+  ];
+  try {
+    const { rows } = await pool.query(query, values);
+    return rows[0];
+  } catch (error) {
+    console.error('Error inserting roster shift assignment removal:', error);
+    throw error;
+  }
+};
+
+/* ===============================
+   Remove an Assignment with Logging
+   ===============================
+   This function logs the removal by inserting a record into the
+   roster_shift_assignment_removals table and then updates the assignment's
+   status to 'removed' (instead of deleting the row).
+*/
+export const removeRosterShiftAssignment = async (
+  roster_shift_assignment_id: number,
+  removal_reason: string | undefined,
+  company_id: number,
+  removed_by: number
+): Promise<RosterShiftAssignment> => {
+  // Insert removal log
+  await insertRosterShiftAssignmentRemoval({
+    company_id,
+    roster_shift_assignment_id,
+    removed_by,
+    removal_reason,
+  });
+  // Update assignment status to 'removed'
+  const updatedAssignment = await updateRosterShiftAssignment(roster_shift_assignment_id, {
+    assignment_status: 'removed',
+  });
+  return updatedAssignment;
+};
