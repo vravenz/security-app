@@ -36,10 +36,15 @@ import {
   removeRosterShiftAssignment,
   getAssignmentsByRosterId,
   insertSingleRosterShiftAssignment,
-  insertRosterShiftAssignmentHistory
+  insertRosterShiftAssignmentHistory,
+  getActiveAssignmentsByShiftId,
+  getRemovedAssignmentsByShiftId,
+  getRosterShiftHistoryByShiftId,
+  getRosterShiftAssignmentHistoryByShiftId
 } from '../../models/roster/rosterShiftAssignments';
 
-import { insertRosterShiftHistory } from '../../models/roster/rosterShiftHistory';
+
+import { insertRosterShiftHistory, RosterShiftHistory } from '../../models/roster/rosterShiftHistory';
 
 export const createRoster = async (req: Request, res: Response): Promise<void> => {
   const client = await pool.connect();
@@ -428,37 +433,43 @@ export const updateRosterShiftDetails = async (req: Request, res: Response): Pro
     // Update the shift record (this update does NOT change shift_date, start/end times, or break_time)
     const updatedShift = await updateRosterShift(shift_id, req.body);
 
-    // Prepare history record data
-    const historyData = {
+    // Build a diff object that includes only fields that have changed.
+    // If a field is unchanged, we set its value to undefined.
+    const diffHistoryData: RosterShiftHistory = {
       company_id: currentShift.company_id,
       roster_shift_id: shift_id,
-      shift_status: updatedShift.shift_status,
-      penalty: updatedShift.penalty,
-      comments: updatedShift.comments,
-      shift_instruction: updatedShift.shift_instruction,
-      payable_rate_type: updatedShift.payable_rate_type,
-      payable_role: updatedShift.payable_role,
-      payable_amount: updatedShift.payable_amount,
-      billable_role: updatedShift.billable_role,
-      billable_amount: updatedShift.billable_amount,
-      payable_expenses: updatedShift.payable_expenses,
-      billable_expenses: updatedShift.billable_expenses,
-      unpaid_shift: updatedShift.unpaid_shift,
-      training_shift: updatedShift.training_shift,
-      updated_by: (req as any).userId  // Must be a valid user ID present in the "users" table
+      shift_status: updatedShift.shift_status !== currentShift.shift_status ? updatedShift.shift_status : undefined,
+      penalty: updatedShift.penalty !== currentShift.penalty ? updatedShift.penalty : undefined,
+      comments: updatedShift.comments !== currentShift.comments ? updatedShift.comments : undefined,
+      shift_instruction: updatedShift.shift_instruction !== currentShift.shift_instruction ? updatedShift.shift_instruction : undefined,
+      payable_rate_type: updatedShift.payable_rate_type !== currentShift.payable_rate_type ? updatedShift.payable_rate_type : undefined,
+      payable_role: updatedShift.payable_role !== currentShift.payable_role ? updatedShift.payable_role : undefined,
+      payable_amount: updatedShift.payable_amount !== currentShift.payable_amount ? updatedShift.payable_amount : undefined,
+      billable_role: updatedShift.billable_role !== currentShift.billable_role ? updatedShift.billable_role : undefined,
+      billable_amount: updatedShift.billable_amount !== currentShift.billable_amount ? updatedShift.billable_amount : undefined,
+      payable_expenses: updatedShift.payable_expenses !== currentShift.payable_expenses ? updatedShift.payable_expenses : undefined,
+      billable_expenses: updatedShift.billable_expenses !== currentShift.billable_expenses ? updatedShift.billable_expenses : undefined,
+      unpaid_shift: updatedShift.unpaid_shift !== currentShift.unpaid_shift ? updatedShift.unpaid_shift : undefined,
+      training_shift: updatedShift.training_shift !== currentShift.training_shift ? updatedShift.training_shift : undefined,
+      updated_by: (req as any).userId,
     };
 
-    // If userId is missing, rollback and respond with an error.
-    if (!historyData.updated_by) {
-      await client.query('ROLLBACK');
-      res.status(400).json({ message: 'Missing userId. A valid userId is required to update shift.' });
-      return;
+    // Check if at least one field has changed.
+    const fieldsToCheck = [
+      'shift_status', 'penalty', 'comments', 'shift_instruction', 'payable_rate_type',
+      'payable_role', 'payable_amount', 'billable_role', 'billable_amount',
+      'payable_expenses', 'billable_expenses', 'unpaid_shift', 'training_shift'
+    ];
+    const isChanged = fieldsToCheck.some(field => diffHistoryData[field as keyof RosterShiftHistory] !== undefined);
+
+    if (isChanged) {
+      // Insert a history record capturing the changed fields.
+      await insertRosterShiftHistory(diffHistoryData);
+    } else {
+      console.log('No changes detected. History record not inserted.');
     }
 
-    // Insert a history record capturing the updated shift details.
-    await insertRosterShiftHistory(historyData);
-
-    // Send the updated shift details as JSON
+    // Send the updated shift details as JSON.
     res.json(updatedShift);
   } catch (error) {
     console.error('Error updating roster shift:', error);
@@ -614,9 +625,6 @@ export const createSingleRosterEmployee = async (req: Request, res: Response): P
       subcontractor
     };
 
-    // Log the input data for debugging.
-    console.log('Creating RosterEmployee with data:', newRosterEmployeeData);
-
     // Insert the new RosterEmployee into the database.
     const createdEmployee = await insertSingleRosterEmployee(newRosterEmployeeData);
 
@@ -629,5 +637,62 @@ export const createSingleRosterEmployee = async (req: Request, res: Response): P
   } catch (error) {
     console.error('Error creating single roster employee:', error);
     res.status(500).json({ message: 'Server error while creating single roster employee.' });
+  }
+};
+
+
+/**
+ * GET /api/rosters/:id/detailed
+ * Returns full roster details including:
+ * - Basic roster information
+ * - All shifts for that roster, and for each shift:
+ *   - Active assignments (with employee details)
+ *   - Removed assignments (with removal info)
+ *   - Shift history records
+ *   - Assignment history records
+ */
+export const getDetailedRosterView = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const roster_id = parseInt(req.params.id, 10);
+    if (isNaN(roster_id)) {
+      res.status(400).json({ message: 'Invalid roster ID' });
+      return;
+    }
+
+    // Fetch the basic roster details.
+    const roster = await getRosterById(roster_id);
+    if (!roster) {
+      res.status(404).json({ message: 'Roster not found' });
+      return;
+    }
+
+    // Fetch all shifts for this roster.
+    const shifts = await getRosterShiftsByRosterId(roster_id);
+
+    // For each shift, fetch detailed info.
+    const detailedShifts = await Promise.all(
+      shifts.map(async (shift) => {
+        // Use non-null assertion since roster_shift_id should be defined.
+        const activeAssignments = await getActiveAssignmentsByShiftId(shift.roster_shift_id!);
+        const removedAssignments = await getRemovedAssignmentsByShiftId(shift.roster_shift_id!);
+        const shiftHistory = await getRosterShiftHistoryByShiftId(shift.roster_shift_id!);
+        const assignmentHistory = await getRosterShiftAssignmentHistoryByShiftId(shift.roster_shift_id!);
+        return {
+          shift,
+          activeAssignments,
+          removedAssignments,
+          shiftHistory,
+          assignmentHistory
+        };
+      })
+    );
+
+    res.json({
+      roster,
+      shifts: detailedShifts
+    });
+  } catch (error) {
+    console.error('Error fetching detailed roster view:', error);
+    res.status(500).json({ message: 'Server error while fetching detailed roster view' });
   }
 };

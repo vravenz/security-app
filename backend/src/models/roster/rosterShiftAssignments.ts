@@ -1,4 +1,5 @@
 import pool from '../../config/database';
+import { RosterShiftHistory } from './rosterShiftHistory';
 
 /* ===============================
    Roster Shift Assignment Interface
@@ -362,4 +363,78 @@ export const removeRosterShiftAssignment = async (
     assignment_status: 'removed',
   });
   return updatedAssignment;
+};
+
+
+/**
+ * Get active assignments for a given shift.
+ */
+export const getActiveAssignmentsByShiftId = async (
+  roster_shift_id: number
+): Promise<any[]> => {
+  const query = `
+    SELECT rsa.*, a.first_name, a.last_name
+    FROM public.roster_shift_assignments rsa
+    JOIN public.roster_employees re ON re.roster_employee_id = rsa.roster_employee_id
+    JOIN public.applicants a ON a.applicant_id = re.applicant_id
+    WHERE rsa.roster_shift_id = $1 
+      AND rsa.assignment_status = 'active'
+    ORDER BY rsa.created_at;
+  `;
+  const { rows } = await pool.query(query, [roster_shift_id]);
+  return rows;
+};
+
+/**
+ * Get removed assignments for a given shift.
+ */
+export const getRemovedAssignmentsByShiftId = async (
+  roster_shift_id: number
+): Promise<any[]> => {
+  const query = `
+    SELECT rra.*, a.first_name, a.last_name
+    FROM public.roster_shift_assignment_removals rra
+    JOIN public.roster_shift_assignments rsa ON rsa.roster_shift_assignment_id = rra.roster_shift_assignment_id
+    JOIN public.roster_employees re ON re.roster_employee_id = rsa.roster_employee_id
+    JOIN public.applicants a ON a.applicant_id = re.applicant_id
+    WHERE rsa.roster_shift_id = $1
+    ORDER BY rra.removed_at DESC;
+  `;
+  const { rows } = await pool.query(query, [roster_shift_id]);
+  return rows;
+};
+
+/**
+ * Get shift history for a given shift.
+ */
+export const getRosterShiftHistoryByShiftId = async (
+  roster_shift_id: number
+): Promise<RosterShiftHistory[]> => {
+  const query = `
+    SELECT *
+    FROM public.roster_shift_history
+    WHERE roster_shift_id = $1
+    ORDER BY changed_at DESC;
+  `;
+  const { rows } = await pool.query(query, [roster_shift_id]);
+  return rows;
+};
+
+/**
+ * Get assignment history for a given shift.
+ */
+export const getRosterShiftAssignmentHistoryByShiftId = async (
+  roster_shift_id: number
+): Promise<any[]> => {
+  const query = `
+    SELECT rsha.*, a.first_name, a.last_name
+    FROM public.roster_shift_assignment_history rsha
+    JOIN public.roster_shift_assignments rsa ON rsa.roster_shift_assignment_id = rsha.roster_shift_assignment_id
+    JOIN public.roster_employees re ON re.roster_employee_id = rsa.roster_employee_id
+    JOIN public.applicants a ON a.applicant_id = re.applicant_id
+    WHERE rsa.roster_shift_id = $1
+    ORDER BY rsha.changed_at DESC;
+  `;
+  const { rows } = await pool.query(query, [roster_shift_id]);
+  return rows;
 };

@@ -623,16 +623,6 @@ const EditRosterShiftPage: React.FC = () => {
                     options={field.options}
                   />
                 ))}
-                {/* Render an input field for subcontractor ID */}
-                <InputField
-                  type="text"
-                  name="subcontractor"
-                  value={formData.subcontractor || ''}
-                  label="Subcontractor ID"
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, subcontractor: e.target.value }))
-                  }
-                />
               </Card>
             </div>
           </div>

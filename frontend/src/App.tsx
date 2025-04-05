@@ -48,6 +48,7 @@ import ScheduleRoasterPage from './pages/protected/roaster/ScheduleRoasterPage';
 import AddRoasterPage from './pages/protected/roaster/AddRoasterPage';
 import GuardRoasterPage from './pages/protected/roaster/GuardRoasterPage';
 import EditRoasterPage from './pages/protected/roaster/EditRoasterPage';
+import DetailedRosterViewPage from './pages/protected/roaster/DetailedRosterViewPage';
 
 // Terms and Conditions
 import TermsAndConditionsPage from './pages/protected/terms-and-conditions/TermsAndConditionsPage';
@@ -107,6 +108,7 @@ const App = () => {
               <Route path="/rosters/schedule" element={<ScheduleRoasterPage />} />
               <Route path="/rosters/guards" element={<GuardRoasterPage />} />
               <Route path="/rosters/edit/:id" element={<EditRoasterPage />} />
+              <Route path="/rosters/view/:id" element={<DetailedRosterViewPage />} />
               {/* ===== Privacy Policy ===== */}
               <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
               <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
